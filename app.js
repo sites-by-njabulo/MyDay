@@ -814,7 +814,15 @@ function renderSettings() {
    ========================================================== */
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("sw.js").catch(err => console.error("SW registration failed:", err));
+  navigator.serviceWorker.register("sw.js").then(reg => {
+    // Force an immediate freshness check instead of waiting on the browser's
+    // once-a-day automatic check, so deploys (like a password change) don't
+    // get stuck behind a stale cached service worker.
+    reg.update();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reg.update();
+    });
+  }).catch(err => console.error("SW registration failed:", err));
 }
 
 /* ==========================================================
