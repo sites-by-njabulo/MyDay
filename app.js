@@ -3,7 +3,7 @@
    ========================================================== */
 // CHANGE THIS to your real password before you start using the app for real.
 // This is a casual deterrent only, not real security (visible in page source).
-const APP_PASSWORD = "changeme123";
+const APP_PASSWORD = "02233";
 
 const STORAGE_KEY = "myday_state";
 const SESSION_UNLOCK_KEY = "myday_unlocked";
