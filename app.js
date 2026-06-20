@@ -12,6 +12,9 @@ const DEFAULT_GOALS = { pushups: 200, curls: 100 };
 const CHALLENGE_TARGET = 10000;
 const CHALLENGE_DURATION_DAYS = 60;
 
+// Shown on the You page header and used for the nav avatar initial.
+const USER_NAME = "Njabulo";
+
 // Inline SVG icons (replace emoji throughout the UI).
 const ICONS = {
   check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12.5l2.5 2.5L16 9"/></svg>`,
@@ -20,7 +23,12 @@ const ICONS = {
   dumbbell: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="4" height="6" rx="1"/><rect x="18" y="9" width="4" height="6" rx="1"/><line x1="6" y1="12" x2="18" y2="12"/></svg>`,
   warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9.5 16.5H2.5z"/><line x1="12" y1="9.5" x2="12" y2="14"/><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"/></svg>`,
   download: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7.5 11l4.5 4.5L16.5 11"/><path d="M4 18.5h16"/></svg>`,
-  upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/><path d="M4 18.5h16"/></svg>`
+  upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="M7.5 8.5L12 4l4.5 4.5"/><path d="M4 18.5h16"/></svg>`,
+  gear: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  video: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10.5 9l4.5 3-4.5 3V9z" fill="currentColor" stroke="none"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>`,
+  target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg>`,
+  chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`
 };
 
 /* ==========================================================
@@ -33,7 +41,7 @@ function defaultState() {
     todos: [],
     videoPlan: [],
     challenge: { startDate: null, targetAmount: CHALLENGE_TARGET, durationDays: CHALLENGE_DURATION_DAYS, entries: [] },
-    settings: { prayerReminderTime: "07:00", workoutReminderTime: "18:00" }
+    settings: { prayerReminderTime: "07:00", workoutReminderTime: "18:00", theme: "dark" }
   };
 }
 
@@ -52,6 +60,7 @@ function migrateState(s) {
       delete day.faith.prayerDone;
     }
   });
+  if (typeof s.settings.theme === "undefined") s.settings.theme = "dark";
   return s;
 }
 
@@ -72,6 +81,13 @@ let state = loadState();
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+
+// Applied immediately on load (so the splash/lock screens also respect a saved
+// theme) and again whenever the Settings toggle changes it.
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", state.settings.theme);
+}
+applyTheme();
 
 function formatDateKey(d) {
   const y = d.getFullYear();
@@ -125,6 +141,7 @@ function ring(pct, size, stroke, centerHtml) {
 /* ==========================================================
    3. AUTH
    ========================================================== */
+const splashView = document.getElementById("splash-view");
 const lockView = document.getElementById("lock-view");
 const appView = document.getElementById("app-view");
 const lockForm = document.getElementById("lock-form");
@@ -169,7 +186,8 @@ const mainNav = document.getElementById("main-nav");
 
 function showSection(name) {
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.dataset.page === name));
-  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === name));
+  const navTarget = (name === "settings" || name === "video") ? "you" : name;
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === navTarget));
   renderSection(name);
 }
 
@@ -186,8 +204,7 @@ function renderSection(name) {
     case "faith": renderFaith(); break;
     case "workout": renderWorkout(); break;
     case "video": renderVideoPlan(); break;
-    case "challenge": renderChallenge(); break;
-    case "calendar": renderCalendar(); break;
+    case "you": renderYou(); break;
     case "settings": renderSettings(); break;
   }
 }
@@ -202,7 +219,29 @@ function cycleIndex() {
   return (new Date().getDate() - 1) % 30;
 }
 
+let homeTab = "today"; // "today" | "challenge"
+
 function renderHome() {
+  document.getElementById("page-home").innerHTML = `
+    <div class="home-tabbar">
+      <button class="home-tab ${homeTab === "today" ? "active" : ""}" data-tab="today">Today</button>
+      <button class="home-tab ${homeTab === "challenge" ? "active" : ""}" data-tab="challenge">Challenge</button>
+    </div>
+    <div id="home-tab-content"></div>
+  `;
+
+  document.querySelectorAll(".home-tab").forEach(btn => {
+    btn.addEventListener("click", function () {
+      homeTab = btn.dataset.tab;
+      renderHome();
+    });
+  });
+
+  if (homeTab === "today") renderHomeToday();
+  else renderChallenge("home-tab-content");
+}
+
+function renderHomeToday() {
   const today = new Date();
   const todayKey = getTodayKey();
   const dateLabel = `${WEEKDAYS[today.getDay()]}, ${MONTHS[today.getMonth()]} ${today.getDate()}`;
@@ -218,10 +257,18 @@ function renderHome() {
   const curls = day.workout.curls;
   const cs = getChallengeStats();
 
-  document.getElementById("page-home").innerHTML = `
-    <div class="home-header">
-      <p class="home-eyebrow">Today</p>
-      <h1 class="home-date">${dateLabel}</h1>
+  document.getElementById("home-tab-content").innerHTML = `
+    <p class="eyebrow">${dateLabel}</p>
+
+    <div class="verse-card">
+      <p class="eyebrow verse-eyebrow">Verse of the day</p>
+      <p class="verse-ref">${verse.reference}</p>
+      <p class="verse-text">${verse.text}</p>
+    </div>
+
+    <div class="quote-card">
+      <p class="quote-text">${quote.text}</p>
+      ${quote.author ? `<p class="quote-author">— ${quote.author}</p>` : ""}
     </div>
 
     <div class="overview-card">
@@ -253,17 +300,6 @@ function renderHome() {
           <span class="overview-value">${curls.count}/${curls.goal}</span>
         </div>
       </div>
-    </div>
-
-    <div class="verse-card">
-      <div class="verse-mark">"</div>
-      <p class="verse-text">${verse.text}</p>
-      <p class="verse-ref">${verse.reference}</p>
-    </div>
-
-    <div class="quote-card">
-      <p class="quote-text">${quote.text}</p>
-      ${quote.author ? `<p class="quote-author">— ${quote.author}</p>` : ""}
     </div>
 
     <div class="challenge-summary-card">
@@ -309,7 +345,32 @@ function todoItemHtml(t, showDate) {
   `;
 }
 
+let todoView = "list"; // "list" | "calendar"
+
 function renderTodo() {
+  document.getElementById("page-todo").innerHTML = `
+    <div class="page-header">
+      <h1 class="page-title">To-Do List</h1>
+    </div>
+    <div class="seg-control">
+      <button class="seg-btn ${todoView === "list" ? "active" : ""}" data-view="list">List</button>
+      <button class="seg-btn ${todoView === "calendar" ? "active" : ""}" data-view="calendar">Calendar</button>
+    </div>
+    <div id="todo-view-content"></div>
+  `;
+
+  document.querySelectorAll(".seg-btn").forEach(btn => {
+    btn.addEventListener("click", function () {
+      todoView = btn.dataset.view;
+      renderTodo();
+    });
+  });
+
+  if (todoView === "list") renderTodoList();
+  else renderCalendar("todo-view-content");
+}
+
+function renderTodoList() {
   const todayKey = getTodayKey();
   const todayTodos = state.todos.filter(t => t.date <= todayKey);
   const upcomingTodos = state.todos.filter(t => t.date > todayKey).sort((a, b) => a.date.localeCompare(b.date));
@@ -326,11 +387,8 @@ function renderTodo() {
     `
     : "";
 
-  document.getElementById("page-todo").innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">To-Do List</h1>
-      <p class="page-sub">${todosDone}/${todayTodos.length} completed today</p>
-    </div>
+  document.getElementById("todo-view-content").innerHTML = `
+    <p class="page-sub todo-progress">${todosDone}/${todayTodos.length} completed today</p>
 
     <form id="todo-form" class="add-form">
       <input type="text" id="todo-input" placeholder="Add a task..." aria-label="Task description" autocomplete="off" maxlength="120" />
@@ -350,10 +408,10 @@ function renderTodo() {
     if (!text) return;
     state.todos.push({ id: uid("t"), text, done: false, date: dateInput.value || todayKey });
     saveState();
-    renderTodo();
+    renderTodoList();
   });
 
-  document.getElementById("page-todo").addEventListener("click", function (e) {
+  document.getElementById("todo-view-content").addEventListener("click", function (e) {
     const btn = e.target.closest("button[data-action]");
     if (!btn) return;
     const li = btn.closest(".todo-item");
@@ -365,7 +423,7 @@ function renderTodo() {
       state.todos = state.todos.filter(t => t.id !== id);
     }
     saveState();
-    renderTodo();
+    renderTodoList();
   });
 }
 
@@ -557,11 +615,11 @@ function getChallengeStats() {
   return { started: true, daysRemaining, dayNumber, totalEarned, pct };
 }
 
-function renderChallenge() {
+function renderChallenge(targetId = "page-challenge") {
   const c = state.challenge;
 
   if (!c.startDate) {
-    document.getElementById("page-challenge").innerHTML = `
+    document.getElementById(targetId).innerHTML = `
       <div class="page-header">
         <h1 class="page-title">$10K Challenge</h1>
         <p class="page-sub">A 60-day push toward $10,000/month.</p>
@@ -574,7 +632,7 @@ function renderChallenge() {
     document.getElementById("start-challenge-btn").addEventListener("click", function () {
       c.startDate = getTodayKey();
       saveState();
-      renderChallenge();
+      renderChallenge(targetId);
     });
     return;
   }
@@ -595,7 +653,7 @@ function renderChallenge() {
     `).join("")
     : `<li class="todo-empty">No income logged yet. Add your first deal below.</li>`;
 
-  document.getElementById("page-challenge").innerHTML = `
+  document.getElementById(targetId).innerHTML = `
     <div class="page-header">
       <h1 class="page-title">$10K Challenge</h1>
       <p class="page-sub">Day ${dayNumber} of ${c.durationDays}</p>
@@ -636,7 +694,7 @@ function renderChallenge() {
     if (!amount || amount <= 0) return;
     c.entries.push({ id: uid("e"), amount, description: descInput.value.trim(), date: getTodayKey() });
     saveState();
-    renderChallenge();
+    renderChallenge(targetId);
   });
 
   document.querySelector(".entry-list").addEventListener("click", function (e) {
@@ -645,7 +703,7 @@ function renderChallenge() {
     const id = btn.closest(".entry-item").dataset.id;
     c.entries = c.entries.filter(e => e.id !== id);
     saveState();
-    renderChallenge();
+    renderChallenge(targetId);
   });
 }
 
@@ -668,7 +726,7 @@ function buildMonthGrid(year, month) {
   return cells;
 }
 
-function renderCalendar() {
+function renderCalendar(targetId = "todo-view-content") {
   const cells = buildMonthGrid(calYear, calMonth);
   const todayKey = getTodayKey();
   const datesWithTasks = new Set(state.todos.map(t => t.date));
@@ -699,10 +757,7 @@ function renderCalendar() {
     `;
   }
 
-  document.getElementById("page-calendar").innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">Calendar</h1>
-    </div>
+  document.getElementById(targetId).innerHTML = `
     <div class="cal-layout">
       <div class="cal-card">
         <div class="cal-nav">
@@ -722,58 +777,132 @@ function renderCalendar() {
   document.getElementById("cal-prev").addEventListener("click", function () {
     calMonth--;
     if (calMonth < 0) { calMonth = 11; calYear--; }
-    renderCalendar();
+    renderCalendar(targetId);
   });
   document.getElementById("cal-next").addEventListener("click", function () {
     calMonth++;
     if (calMonth > 11) { calMonth = 0; calYear++; }
-    renderCalendar();
+    renderCalendar(targetId);
   });
   document.querySelector(".cal-grid").addEventListener("click", function (e) {
     const cell = e.target.closest(".cal-cell");
     if (!cell) return;
     selectedCalDate = cell.dataset.date;
-    renderCalendar();
+    renderCalendar(targetId);
   });
 }
 
 /* ==========================================================
-   12. SETTINGS
+   12. YOU
+   ========================================================== */
+function renderYou() {
+  const cs = getChallengeStats();
+  const todayKey = getTodayKey();
+  const todosToday = state.todos.filter(t => t.date <= todayKey);
+  const todosDone = todosToday.filter(t => t.done).length;
+
+  document.getElementById("page-you").innerHTML = `
+    <div class="you-header">
+      <button class="you-gear" id="you-settings-btn" aria-label="Settings">${ICONS.gear}</button>
+    </div>
+
+    <div class="you-identity">
+      <h1 class="you-name">${USER_NAME}</h1>
+      <span class="you-avatar">${USER_NAME.charAt(0)}</span>
+    </div>
+
+    <div class="you-tiles">
+      <button class="you-tile" data-action="video">${ICONS.video}<span>Videos</span></button>
+      <button class="you-tile" data-action="calendar">${ICONS.calendar}<span>Calendar</span></button>
+      <button class="you-tile" data-action="challenge">${ICONS.target}<span>Challenge</span></button>
+    </div>
+
+    <div class="you-stat-card">
+      <div>
+        <span class="you-stat-value">${cs.started ? cs.dayNumber : "—"}</span>
+        <span class="you-stat-label">Challenge Day${cs.started ? ` of ${state.challenge.durationDays}` : ""}</span>
+      </div>
+      ${ring(cs.pct, 44, 5, `<span class="ring-pct">${cs.pct}%</span>`)}
+    </div>
+
+    <div class="you-stat-card">
+      <div>
+        <span class="you-stat-value">${todosDone}/${todosToday.length}</span>
+        <span class="you-stat-label">To-Dos Today</span>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("you-settings-btn").addEventListener("click", () => showSection("settings"));
+
+  document.querySelectorAll(".you-tile").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const action = btn.dataset.action;
+      if (action === "video") {
+        showSection("video");
+      } else if (action === "calendar") {
+        todoView = "calendar";
+        showSection("todo");
+      } else if (action === "challenge") {
+        homeTab = "challenge";
+        showSection("home");
+      }
+    });
+  });
+}
+
+/* ==========================================================
+   13. SETTINGS
    ========================================================== */
 function renderSettings() {
   document.getElementById("page-settings").innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">Settings</h1>
+    <div class="settings-topbar">
+      <button class="settings-back" id="settings-back-btn" aria-label="Back">${ICONS.chevronLeft}</button>
+      <h1 class="settings-title">Settings</h1>
+      <span class="settings-topbar-spacer"></span>
     </div>
 
-    <div class="settings-card">
-      <h2 class="section-heading">Reminder times</h2>
-      <div class="settings-row">
-        <label for="workout-time">${ICONS.dumbbell} Workout reminder</label>
+    <h2 class="settings-section-label">Appearance</h2>
+    <div class="settings-list">
+      <div class="settings-list-row">
+        <span class="settings-row-label">Dark mode</span>
+        <button class="toggle-pill ${state.settings.theme === "dark" ? "on" : ""}" id="theme-toggle" role="switch" aria-checked="${state.settings.theme === "dark"}"><span class="toggle-pill-knob"></span></button>
+      </div>
+    </div>
+
+    <h2 class="settings-section-label">Reminder times</h2>
+    <div class="settings-list">
+      <div class="settings-list-row">
+        <span class="settings-row-label">Workout reminder</span>
         <input type="time" id="workout-time" value="${state.settings.workoutReminderTime}" />
       </div>
-      <p class="settings-note">${ICONS.warning}<span>Prayer now reminds you 3x a day (1PM, 5PM, 8PM) — those times
-      are fixed in <code>.github/workflows/reminders.yml</code>, not editable here. Changing the workout time above
-      updates MyDay only; you must also edit the matching cron line in that file (and push the change) for the real
-      reminder to move. See CLAUDE.md for the full notification setup guide.</span></p>
     </div>
+    <p class="settings-note">${ICONS.warning}<span>Prayer now reminds you 3x a day (1PM, 5PM, 8PM) — those times
+    are fixed in <code>.github/workflows/reminders.yml</code>, not editable here. Changing the workout time above
+    updates MyDay only; you must also edit the matching cron line in that file (and push the change) for the real
+    reminder to move. See CLAUDE.md for the full notification setup guide.</span></p>
 
-    <div class="settings-card">
-      <h2 class="section-heading">Backup your data</h2>
-      <p class="settings-note">MyDay stores everything on this device only — your laptop browser and your installed
-      Android app do not sync automatically. Export here, then import on the other device to move your data.</p>
-      <div class="settings-actions">
-        <button id="export-btn">${ICONS.download} Export Data</button>
-        <label class="import-btn">${ICONS.upload} Import Data<input type="file" id="import-input" accept="application/json" hidden /></label>
-      </div>
+    <h2 class="settings-section-label">Backup your data</h2>
+    <div class="settings-list">
+      <button class="settings-list-row settings-row-action" id="export-btn"><span class="settings-row-label">${ICONS.download} Export Data</span></button>
+      <label class="settings-list-row settings-row-action import-btn"><span class="settings-row-label">${ICONS.upload} Import Data</span><input type="file" id="import-input" accept="application/json" hidden /></label>
     </div>
+    <p class="settings-note">MyDay stores everything on this device only — your laptop browser and your installed
+    Android app do not sync automatically. Export here, then import on the other device to move your data.</p>
 
-    <div class="settings-card">
-      <h2 class="section-heading">About</h2>
-      <p class="settings-note">MyDay is password-protected casually, not securely — the password lives in plain
-      text in app.js. Don't rely on it to protect sensitive information from a determined viewer.</p>
-    </div>
+    <h2 class="settings-section-label">About</h2>
+    <p class="settings-note">MyDay is password-protected casually, not securely — the password lives in plain
+    text in app.js. Don't rely on it to protect sensitive information from a determined viewer.</p>
   `;
+
+  document.getElementById("settings-back-btn").addEventListener("click", () => showSection("you"));
+
+  document.getElementById("theme-toggle").addEventListener("click", function () {
+    state.settings.theme = state.settings.theme === "dark" ? "light" : "dark";
+    saveState();
+    applyTheme();
+    renderSettings();
+  });
 
   document.getElementById("workout-time").addEventListener("change", function (e) {
     state.settings.workoutReminderTime = e.target.value;
@@ -810,7 +939,7 @@ function renderSettings() {
 }
 
 /* ==========================================================
-   13. SERVICE WORKER + ONESIGNAL
+   14. SERVICE WORKER + ONESIGNAL
    ========================================================== */
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
@@ -826,18 +955,29 @@ function registerServiceWorker() {
 }
 
 /* ==========================================================
-   14. BOOTSTRAP
+   15. BOOTSTRAP
    ========================================================== */
 function initApp() {
   ensureDayRecord(getTodayKey());
+  document.querySelectorAll(".nav-avatar").forEach(el => el.textContent = USER_NAME.charAt(0));
   showSection("home");
   registerServiceWorker();
 }
 
-if (isUnlocked()) {
-  lockView.classList.add("hidden");
-  appView.classList.remove("hidden");
-  initApp();
-} else {
-  showLock();
+function runSplash() {
+  setTimeout(() => {
+    splashView.classList.add("fade-out");
+    setTimeout(() => {
+      splashView.classList.add("hidden");
+      if (isUnlocked()) {
+        lockView.classList.add("hidden");
+        appView.classList.remove("hidden");
+        initApp();
+      } else {
+        showLock();
+      }
+    }, 400); // matches #splash-view's CSS transition duration
+  }, 700); // minimum splash dwell time
 }
+
+runSplash();

@@ -1,6 +1,6 @@
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
-const CACHE_NAME = "myday-v2";
+const CACHE_NAME = "myday-v3";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +10,9 @@ const STATIC_ASSETS = [
   "./data/quotes.js",
   "./manifest.json",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/logo-myday.png",
+  "./icons/logo-mark.png"
 ];
 
 self.addEventListener("install", function (event) {
