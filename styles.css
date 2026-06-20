@@ -371,6 +371,10 @@ button, input { font-family: inherit; }
   transition: color 0.2s var(--ease-out-quart), transform 0.15s var(--ease-out-quart), background-color 0.2s var(--ease-out-quart);
 }
 .nav-item:active { transform: scale(0.92); }
+/* Challenge is a desktop-only shortcut to the Home page's own Today/Challenge
+   tab toggle (which remains the single source of truth) — not its own page,
+   so it doesn't compete for space in the mobile bottom nav. */
+.nav-item-desktop-only { display: none; }
 .nav-icon { line-height: 1; display: flex; transition: color 0.2s var(--ease-out-quart); }
 .nav-icon svg { width: 20px; height: 20px; }
 .nav-avatar {
@@ -472,6 +476,7 @@ button, input { font-family: inherit; }
   }
   .nav-item::before { content: none; }
   .nav-item.active .nav-icon { color: var(--accent); }
+  .nav-item-desktop-only { display: flex; }
 
   #main-content { margin-left: var(--nav-w); padding: 36px 40px 60px; max-width: 760px; }
   /* Reserve exactly the panel's width (280px) + gap (16px) as EXTRA room, so opening

@@ -247,7 +247,8 @@ let currentSectionName = "home";
 function showSection(name) {
   currentSectionName = name;
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.dataset.page === name));
-  const navTarget = (name === "settings" || name === "video") ? "you" : name;
+  let navTarget = (name === "settings" || name === "video") ? "you" : name;
+  if (name === "home" && homeTab === "challenge") navTarget = "challenge";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === navTarget));
   renderSection(name);
 }
@@ -255,6 +256,13 @@ function showSection(name) {
 mainNav.addEventListener("click", function (e) {
   const btn = e.target.closest(".nav-item");
   if (!btn) return;
+  // Challenge is a desktop-only shortcut to the Home page's existing
+  // Today/Challenge tab toggle — it is not its own page/section.
+  if (btn.dataset.section === "challenge") {
+    homeTab = "challenge";
+    showSection("home");
+    return;
+  }
   showSection(btn.dataset.section);
 });
 
@@ -296,6 +304,10 @@ function renderHome() {
     btn.addEventListener("click", function () {
       homeTab = btn.dataset.tab;
       renderHome();
+      // Keep the desktop sidebar's Challenge shortcut in sync with the in-page
+      // tab toggle (which stays the single source of truth for this state).
+      const navTarget = homeTab === "challenge" ? "challenge" : "home";
+      document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === navTarget));
     });
   });
 
