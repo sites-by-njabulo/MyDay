@@ -32,7 +32,12 @@ const ICONS = {
   video: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10.5 9l4.5 3-4.5 3V9z" fill="currentColor" stroke="none"/></svg>`,
   calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>`,
   target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg>`,
-  chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`
+  chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`,
+  attachment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 11.5l-7.6 7.6a4 4 0 0 1-5.7-5.7l8.5-8.5a3 3 0 0 1 4.2 4.2l-8 8a1.5 1.5 0 0 1-2.1-2.1l7-7"/></svg>`,
+  flag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v17"/><path d="M5 4.5c2-1.2 4-1.2 6 0s4 1.2 6 0v9c-2 1.2-4 1.2-6 0s-4-1.2-6 0z"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`,
+  repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.2M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-14 5.2M4 20v-4h4"/></svg>`,
+  notes: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`
 };
 
 /* ==========================================================
@@ -370,15 +375,50 @@ function formatShortDate(dateKey) {
   return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 }
 
+function formatTimeLabel(time) {
+  const [h, m] = time.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+function addDaysToKey(dateKey, n) {
+  const d = new Date(dateKey + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return formatDateKey(d);
+}
+
+function nextWeekdayFromKey(dateKey, targetDow) {
+  const d = new Date(dateKey + "T00:00:00");
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() !== targetDow);
+  return formatDateKey(d);
+}
+
+const PRIORITY_INFO = {
+  low: { label: "Low priority", color: "var(--priority-low)" },
+  med: { label: "Medium priority", color: "var(--priority-medium)" },
+  high: { label: "High priority", color: "var(--priority-high)" }
+};
+const PRIORITY_CYCLE = [null, "low", "med", "high"];
+
 function todoItemHtml(t, showDate) {
+  const pInfo = PRIORITY_INFO[t.priority];
+  const metaParts = [];
+  if (showDate || t.time) {
+    metaParts.push(`${showDate ? formatShortDate(t.date) : ""}${t.time ? `${showDate ? " · " : ""}${formatTimeLabel(t.time)}` : ""}`);
+  }
   return `
     <li class="todo-item ${t.done ? "done" : ""}" data-id="${t.id}">
       <button class="todo-check" data-action="toggle" aria-label="Toggle done">
         ${t.done ? "✓" : ""}
       </button>
       <div class="todo-item-main">
-        <span class="todo-text">${escapeHtml(t.text)}</span>
-        ${showDate ? `<span class="todo-meta">${formatShortDate(t.date)}</span>` : ""}
+        <span class="todo-text-row">
+          ${pInfo ? `<span class="todo-priority-dot" style="background:${pInfo.color}" title="${pInfo.label}"></span>` : ""}
+          <span class="todo-text">${escapeHtml(t.text)}</span>
+        </span>
+        ${t.description ? `<span class="todo-meta todo-desc-meta">${escapeHtml(t.description)}</span>` : ""}
+        ${metaParts.length ? `<span class="todo-meta">${metaParts.join("")}</span>` : ""}
       </div>
       <button class="todo-delete" data-action="delete" aria-label="Delete task">✕</button>
     </li>
@@ -386,7 +426,15 @@ function todoItemHtml(t, showDate) {
 }
 
 let todoView = "list"; // "list" | "calendar"
-let todoFormExpanded = false;
+let todoSheetOpen = false;
+let todoDateSubSheetOpen = false;
+let todoDraftText = "";
+let todoDraftDescription = "";
+let todoDraftDate = null; // null = today
+let todoDraftTime = null;
+let todoDraftPriority = null;
+let sheetCalYear = new Date().getFullYear();
+let sheetCalMonth = new Date().getMonth();
 
 function renderTodo() {
   document.getElementById("page-todo").innerHTML = `
@@ -401,13 +449,17 @@ function renderTodo() {
   document.querySelectorAll(".seg-btn").forEach(btn => {
     btn.addEventListener("click", function () {
       todoView = btn.dataset.view;
-      todoFormExpanded = false;
       renderTodo();
     });
   });
 
-  if (todoView === "list") renderTodoList();
-  else renderCalendar("todo-view-content");
+  if (todoView === "list") {
+    renderTodoList();
+    document.getElementById("todo-fab").classList.remove("hidden");
+  } else {
+    renderCalendar("todo-view-content");
+    document.getElementById("todo-fab").classList.add("hidden");
+  }
 }
 
 function renderTodoList() {
@@ -429,63 +481,17 @@ function renderTodoList() {
     `
     : "";
 
-  const addRowHtml = todoFormExpanded
-    ? `
-      <div class="todo-add-card">
-        <form id="todo-form">
-          <input type="text" id="todo-input" class="todo-name-input" placeholder="e.g., Call the supplier" aria-label="Task name" autocomplete="off" maxlength="120" autofocus />
-          <div class="todo-chip-row">
-            <label class="todo-date-chip">
-              ${ICONS.calendar}
-              <span id="todo-date-label">Today</span>
-              <input type="date" id="todo-date" min="${todayKey}" aria-label="Due date (defaults to today)" />
-            </label>
-          </div>
-          <div class="todo-add-actions">
-            <button type="button" id="todo-cancel-btn" class="todo-btn-cancel">Cancel</button>
-            <button type="submit" class="todo-btn-add">Add task</button>
-          </div>
-        </form>
-      </div>
-    `
-    : `<button class="todo-add-trigger" id="todo-add-trigger">+ <span>Add task</span></button>`;
-
   document.getElementById("todo-view-content").innerHTML = `
     <p class="todo-count">${ICONS.check} ${todosDone}/${todayTodos.length} done today</p>
     <div class="todo-date-divider"><span>${dateHeader}</span></div>
 
-    ${addRowHtml}
+    <button class="todo-add-inline" id="todo-add-inline">+ <span>Add task</span></button>
 
     <ul class="todo-list">${todayHtml}</ul>
     ${upcomingHtml}
   `;
 
-  if (todoFormExpanded) {
-    const dateInput = document.getElementById("todo-date");
-    const dateLabel = document.getElementById("todo-date-label");
-    dateInput.addEventListener("change", function () {
-      dateLabel.textContent = dateInput.value ? formatShortDate(dateInput.value) : "Today";
-    });
-    document.getElementById("todo-cancel-btn").addEventListener("click", function () {
-      todoFormExpanded = false;
-      renderTodoList();
-    });
-    document.getElementById("todo-form").addEventListener("submit", function (e) {
-      e.preventDefault();
-      const input = document.getElementById("todo-input");
-      const text = input.value.trim();
-      if (!text) return;
-      state.todos.push({ id: uid("t"), text, done: false, date: dateInput.value || todayKey });
-      saveState();
-      todoFormExpanded = false;
-      renderTodoList();
-    });
-  } else {
-    document.getElementById("todo-add-trigger").addEventListener("click", function () {
-      todoFormExpanded = true;
-      renderTodoList();
-    });
-  }
+  document.getElementById("todo-add-inline").addEventListener("click", openTodoSheet);
 
   document.getElementById("todo-view-content").addEventListener("click", function (e) {
     const btn = e.target.closest("button[data-action]");
@@ -500,6 +506,214 @@ function renderTodoList() {
     }
     saveState();
     renderTodoList();
+  });
+}
+
+/* ----- Add Task sheet (mobile: bottom sheet · desktop: centered modal) ----- */
+
+function openTodoSheet() {
+  todoSheetOpen = true;
+  todoDateSubSheetOpen = false;
+  todoDraftText = "";
+  todoDraftDescription = "";
+  todoDraftDate = null;
+  todoDraftTime = null;
+  todoDraftPriority = null;
+  const base = todoDraftDate ? new Date(todoDraftDate + "T00:00:00") : new Date();
+  sheetCalYear = base.getFullYear();
+  sheetCalMonth = base.getMonth();
+  renderTodoSheet();
+}
+
+function captureSheetDraftFields() {
+  const nameInput = document.getElementById("todo-sheet-name");
+  const descInput = document.getElementById("todo-sheet-desc");
+  if (nameInput) todoDraftText = nameInput.value;
+  if (descInput) todoDraftDescription = descInput.value;
+}
+
+function closeTodoSheet() {
+  const root = document.getElementById("todo-sheet-root");
+  const panel = root.querySelector(".todo-sheet");
+  const scrim = root.querySelector(".todo-sheet-scrim");
+  if (panel) panel.classList.add("closing");
+  if (scrim) scrim.classList.add("closing");
+  setTimeout(() => {
+    todoSheetOpen = false;
+    todoDateSubSheetOpen = false;
+    root.innerHTML = "";
+  }, 200);
+}
+
+function renderTodoSheet() {
+  const root = document.getElementById("todo-sheet-root");
+  if (!todoSheetOpen) {
+    root.innerHTML = "";
+    return;
+  }
+  root.innerHTML = todoDateSubSheetOpen ? dateSubSheetHtml() : addTaskSheetHtml();
+  root.querySelector(".todo-sheet-scrim").addEventListener("click", closeTodoSheet);
+  if (todoDateSubSheetOpen) attachDateSubSheetEvents();
+  else attachAddTaskSheetEvents();
+}
+
+function addTaskSheetHtml() {
+  const dateLabel = todoDraftDate ? formatShortDate(todoDraftDate) : "Today";
+  const pInfo = PRIORITY_INFO[todoDraftPriority];
+  return `
+    <div class="todo-sheet-scrim" id="todo-sheet-scrim"></div>
+    <div class="todo-sheet" id="todo-sheet-panel" role="dialog" aria-label="Add task">
+      <div class="todo-sheet-handle"></div>
+      <form id="todo-sheet-form">
+        <input type="text" id="todo-sheet-name" class="todo-name-input" placeholder="e.g., Call the supplier" aria-label="Task name" autocomplete="off" maxlength="120" value="${escapeHtml(todoDraftText)}" />
+        <input type="text" id="todo-sheet-desc" class="todo-desc-input" placeholder="Description" aria-label="Description" autocomplete="off" maxlength="300" value="${escapeHtml(todoDraftDescription)}" />
+        <div class="todo-chip-row">
+          <button type="button" class="todo-pill" id="todo-pill-date">
+            ${ICONS.calendar}<span>${dateLabel}${todoDraftTime ? ` · ${formatTimeLabel(todoDraftTime)}` : ""}</span>
+          </button>
+          <button type="button" class="todo-pill" disabled aria-disabled="true">
+            ${ICONS.attachment}<span>Attachment</span>
+          </button>
+          <button type="button" class="todo-pill ${pInfo ? "todo-pill-set" : ""}" id="todo-pill-priority" style="${pInfo ? `--pill-color:${pInfo.color}` : ""}">
+            ${ICONS.flag}<span>${pInfo ? pInfo.label.replace(" priority", "") : "Priority"}</span>
+          </button>
+        </div>
+        <div class="todo-sheet-actions">
+          <button type="button" id="todo-sheet-cancel" class="todo-btn-cancel">Cancel</button>
+          <button type="submit" class="todo-btn-add">Add task</button>
+        </div>
+      </form>
+    </div>
+  `;
+}
+
+function attachAddTaskSheetEvents() {
+  document.getElementById("todo-sheet-cancel").addEventListener("click", closeTodoSheet);
+
+  document.getElementById("todo-pill-priority").addEventListener("click", function () {
+    const idx = PRIORITY_CYCLE.indexOf(todoDraftPriority);
+    todoDraftPriority = PRIORITY_CYCLE[(idx + 1) % PRIORITY_CYCLE.length];
+    captureSheetDraftFields();
+    renderTodoSheet();
+  });
+
+  document.getElementById("todo-pill-date").addEventListener("click", function () {
+    captureSheetDraftFields();
+    todoDateSubSheetOpen = true;
+    const base = todoDraftDate ? new Date(todoDraftDate + "T00:00:00") : new Date();
+    sheetCalYear = base.getFullYear();
+    sheetCalMonth = base.getMonth();
+    renderTodoSheet();
+  });
+
+  document.getElementById("todo-sheet-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    const text = document.getElementById("todo-sheet-name").value.trim();
+    if (!text) return;
+    const description = document.getElementById("todo-sheet-desc").value.trim();
+    state.todos.push({
+      id: uid("t"),
+      text,
+      done: false,
+      date: todoDraftDate || getTodayKey(),
+      description,
+      priority: todoDraftPriority,
+      time: todoDraftTime
+    });
+    saveState();
+    closeTodoSheet();
+    renderTodoList();
+  });
+}
+
+function dateSubSheetHtml() {
+  const todayKey = getTodayKey();
+  const cells = buildMonthGrid(sheetCalYear, sheetCalMonth);
+  const cellsHtml = cells.map(c => {
+    const classes = ["cal-cell"];
+    if (!c.inMonth) classes.push("muted");
+    if (c.dateKey === todayKey) classes.push("today");
+    if (c.dateKey === todoDraftDate) classes.push("selected");
+    return `<div class="${classes.join(" ")}" data-date="${c.dateKey}">${c.day}</div>`;
+  }).join("");
+
+  return `
+    <div class="todo-sheet-scrim" id="todo-sheet-scrim"></div>
+    <div class="todo-sheet todo-date-subsheet" id="todo-sheet-panel" role="dialog" aria-label="Set date">
+      <div class="todo-sheet-handle"></div>
+      <div class="todo-subsheet-header">
+        <button type="button" id="todo-date-back" aria-label="Back">${ICONS.chevronLeft}</button>
+        <span>Set date</span>
+      </div>
+      <ul class="todo-quick-dates">
+        <li><button type="button" data-quick="tomorrow"><span>Tomorrow</span><span class="todo-quick-date-label">${formatShortDate(addDaysToKey(todayKey, 1))}</span></button></li>
+        <li><button type="button" data-quick="nextweek"><span>Next week</span><span class="todo-quick-date-label">${formatShortDate(nextWeekdayFromKey(todayKey, 1))}</span></button></li>
+        <li><button type="button" data-quick="nextweekend"><span>Next weekend</span><span class="todo-quick-date-label">${formatShortDate(nextWeekdayFromKey(todayKey, 6))}</span></button></li>
+        <li><button type="button" data-quick="nodate"><span>No date</span></button></li>
+      </ul>
+      <div class="todo-mini-cal">
+        <div class="cal-nav">
+          <button type="button" id="todo-mini-prev" aria-label="Previous month">${ICONS.chevronLeft}</button>
+          <span class="cal-month-label">${MONTHS[sheetCalMonth]} ${sheetCalYear}</span>
+          <button type="button" id="todo-mini-next" aria-label="Next month"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+        <div class="cal-weekdays">${["S", "M", "T", "W", "T", "F", "S"].map(d => `<div>${d}</div>`).join("")}</div>
+        <div class="cal-grid" id="todo-mini-cal-grid">${cellsHtml}</div>
+      </div>
+      <button type="button" class="todo-subsheet-row" id="todo-time-row">
+        ${ICONS.clock}<span>${todoDraftTime ? formatTimeLabel(todoDraftTime) : "Time"}</span>
+        <input type="time" id="todo-time-input" value="${todoDraftTime || ""}" aria-label="Task time" />
+      </button>
+      <button type="button" class="todo-subsheet-row todo-subsheet-disabled" disabled aria-disabled="true">
+        ${ICONS.repeat}<span>Repeat</span><span class="todo-soon-badge">Soon</span>
+      </button>
+      <div class="todo-sheet-actions">
+        <button type="button" id="todo-date-done" class="todo-btn-add todo-btn-full">Done</button>
+      </div>
+    </div>
+  `;
+}
+
+function attachDateSubSheetEvents() {
+  const backToMain = function () {
+    todoDateSubSheetOpen = false;
+    renderTodoSheet();
+  };
+  document.getElementById("todo-date-back").addEventListener("click", backToMain);
+  document.getElementById("todo-date-done").addEventListener("click", backToMain);
+
+  document.querySelectorAll(".todo-quick-dates button").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const todayKey = getTodayKey();
+      const quick = btn.dataset.quick;
+      if (quick === "tomorrow") todoDraftDate = addDaysToKey(todayKey, 1);
+      else if (quick === "nextweek") todoDraftDate = nextWeekdayFromKey(todayKey, 1);
+      else if (quick === "nextweekend") todoDraftDate = nextWeekdayFromKey(todayKey, 6);
+      else if (quick === "nodate") todoDraftDate = null;
+      backToMain();
+    });
+  });
+
+  document.getElementById("todo-mini-prev").addEventListener("click", function () {
+    sheetCalMonth--;
+    if (sheetCalMonth < 0) { sheetCalMonth = 11; sheetCalYear--; }
+    renderTodoSheet();
+  });
+  document.getElementById("todo-mini-next").addEventListener("click", function () {
+    sheetCalMonth++;
+    if (sheetCalMonth > 11) { sheetCalMonth = 0; sheetCalYear++; }
+    renderTodoSheet();
+  });
+  document.getElementById("todo-mini-cal-grid").addEventListener("click", function (e) {
+    const cell = e.target.closest(".cal-cell");
+    if (!cell) return;
+    todoDraftDate = cell.dataset.date;
+    renderTodoSheet();
+  });
+
+  const timeInput = document.getElementById("todo-time-input");
+  timeInput.addEventListener("change", function () {
+    todoDraftTime = timeInput.value || null;
   });
 }
 
@@ -1042,6 +1256,7 @@ function registerServiceWorker() {
 function initApp() {
   ensureDayRecord(getTodayKey());
   document.querySelectorAll(".nav-avatar").forEach(el => el.textContent = USER_NAME.charAt(0));
+  document.getElementById("todo-fab").addEventListener("click", openTodoSheet);
   showSection("home");
   registerServiceWorker();
 }

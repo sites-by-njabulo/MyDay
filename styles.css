@@ -13,6 +13,9 @@
   --hairline-strong: #34343a;
   --input-bg: #0f1011;
   --danger: #ef4444;
+  --priority-high: #ef4444;
+  --priority-medium: #f59e0b;
+  --priority-low: #60a5fa;
 
   --surface-1: #0f1011;
   --surface-2: #141516;
@@ -477,6 +480,15 @@ button, input { font-family: inherit; }
   #main-content:has(.cal-panel) { max-width: calc(760px + 280px + 16px); }
 }
 
+@keyframes modalFadeScaleIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes modalFadeScaleOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+
 /* ===== Temp placeholder (removed as sections are built) ===== */
 .stub {
   color: var(--text-secondary);
@@ -785,9 +797,9 @@ button, input { font-family: inherit; }
   color: var(--text-primary);
 }
 
-/* Collapsed "+ Add task" trigger row */
-.todo-add-trigger {
-  display: flex;
+/* Inline "+ Add task" row — desktop entry point (hidden on mobile, FAB used instead) */
+.todo-add-inline {
+  display: none;
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -803,18 +815,37 @@ button, input { font-family: inherit; }
   border-radius: var(--radius-sm);
   transition: background 0.15s var(--ease-out-quart);
 }
-.todo-add-trigger:hover { background: var(--input-bg); }
+.todo-add-inline:hover { background: var(--input-bg); }
 
-/* Expanded add-task card */
-.todo-add-card {
-  background: var(--card-bg);
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-  padding: 16px;
-  margin-bottom: 18px;
-  animation: lockFadeUp 0.25s var(--ease-out-quart) both;
+/* Floating Action Button — mobile entry point for Add Task */
+.todo-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(90px + env(safe-area-inset-bottom));
+  width: 58px;
+  height: 58px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(94, 106, 210, 0.45);
+  z-index: 40;
+  transition: background 0.15s var(--ease-out-quart), transform 0.1s var(--ease-out-quart);
 }
+.todo-fab svg { width: 24px; height: 24px; }
+.todo-fab:hover { background: var(--accent-hover); }
+.todo-fab:active { transform: scale(0.94); }
+.todo-fab.hidden { display: none; }
+
+/* Priority dot + description line on task rows */
+.todo-text-row { display: flex; align-items: center; gap: 7px; }
+.todo-priority-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.todo-desc-meta { color: var(--text-secondary); }
+
 .todo-name-input {
   display: block;
   width: 100%;
@@ -825,34 +856,54 @@ button, input { font-family: inherit; }
   font-weight: 600;
   color: var(--text-primary);
   padding: 0 0 10px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   border-bottom: 1px solid var(--border);
 }
 .todo-name-input::placeholder { color: var(--text-secondary); font-weight: 500; }
-.todo-chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.todo-date-chip {
+.todo-desc-input {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 0 0 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.todo-desc-input::placeholder { color: var(--text-secondary); opacity: 0.7; }
+
+.todo-chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+.todo-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  padding: 6px 12px;
+  background: none;
+  padding: 7px 13px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
+  transition: border-color 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart);
 }
-.todo-date-chip svg { width: 14px; height: 14px; }
-.todo-date-chip input[type="date"] {
+.todo-pill svg { width: 14px; height: 14px; }
+.todo-pill:disabled { opacity: 0.45; cursor: default; }
+.todo-pill-set { border-color: var(--pill-color); color: var(--pill-color); }
+.todo-pill-date input[type="date"] {
   position: absolute;
   inset: 0;
   opacity: 0;
   cursor: pointer;
   color-scheme: dark;
 }
-[data-theme="light"] .todo-date-chip input[type="date"] { color-scheme: light; }
-.todo-add-actions { display: flex; justify-content: flex-end; gap: 10px; }
+[data-theme="light"] .todo-pill-date input[type="date"] { color-scheme: light; }
+
+.todo-sheet-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .todo-btn-cancel, .todo-btn-add {
   border: none;
   border-radius: var(--radius-sm);
@@ -867,6 +918,150 @@ button, input { font-family: inherit; }
 .todo-btn-add { background: var(--accent); color: #fff; }
 .todo-btn-add:hover { background: var(--accent-hover); }
 .todo-btn-cancel:active, .todo-btn-add:active { transform: scale(0.97); }
+.todo-btn-full { width: 100%; padding: 12px; text-align: center; }
+
+/* ===== Add Task sheet (mobile: bottom sheet · desktop: centered modal) ===== */
+.todo-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 60;
+  animation: scrimFadeIn 0.22s var(--ease-out-quart) both;
+}
+.todo-sheet-scrim.closing { animation: scrimFadeOut 0.18s var(--ease-out-quart) both; }
+@keyframes scrimFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scrimFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+.todo-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+  background: var(--card-bg);
+  border: 1px solid var(--hairline-strong);
+  border-bottom: none;
+  border-radius: 20px 20px 0 0;
+  box-shadow: var(--shadow-soft);
+  padding: 10px 18px calc(18px + env(safe-area-inset-bottom));
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: sheetSlideUp 0.32s var(--ease-out-expo) both;
+}
+.todo-sheet.closing { animation: sheetSlideDown 0.2s var(--ease-out-quart) both; }
+@keyframes sheetSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheetSlideDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+
+.todo-sheet-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--hairline-strong);
+  margin: 6px auto 14px;
+}
+
+.todo-subsheet-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.todo-subsheet-header button {
+  flex: none;
+  border: none;
+  background: var(--surface-3);
+  color: var(--text-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.todo-subsheet-header button svg { width: 16px; height: 16px; }
+.todo-subsheet-header span { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+
+.todo-quick-dates { list-style: none; margin: 0 0 16px; padding: 0; }
+.todo-quick-dates button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  padding: 12px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.todo-quick-date-label { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+
+.todo-mini-cal { margin-bottom: 8px; }
+
+.todo-subsheet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  padding: 13px 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.todo-subsheet-row svg { width: 17px; height: 17px; color: var(--text-secondary); flex: none; }
+.todo-subsheet-row input[type="time"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  color-scheme: dark;
+}
+[data-theme="light"] .todo-subsheet-row input[type="time"] { color-scheme: light; }
+.todo-subsheet-disabled { color: var(--text-secondary); cursor: default; }
+.todo-soon-badge {
+  margin-left: auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  padding: 3px 8px;
+}
+
+@media (min-width: 769px) {
+  /* Add Task: a floating corner FAB is a mobile-only convention — desktop uses the inline trigger instead. */
+  .todo-fab { display: none !important; }
+  .todo-add-inline { display: flex; }
+
+  /* Add Task sheet becomes a centered modal on desktop (fade + scale, not slide-up). */
+  .todo-sheet {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    width: 480px;
+    max-width: 90vw;
+    border-bottom: 1px solid var(--hairline-strong);
+    border-radius: var(--radius-lg);
+    padding: 18px 22px 22px;
+    transform: translate(-50%, -50%);
+    animation: modalFadeScaleIn 0.22s var(--ease-out-quart) both;
+  }
+  .todo-sheet.closing { animation: modalFadeScaleOut 0.16s var(--ease-out-quart) both; }
+  .todo-sheet-handle { display: none; }
+}
 
 .todo-list {
   list-style: none;
