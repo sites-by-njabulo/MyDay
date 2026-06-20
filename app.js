@@ -1,6 +1,10 @@
 /* ==========================================================
    1. CONFIG
    ========================================================== */
+// Set to true to bring the password gate back. While false, the splash
+// screen leads straight into the app and the lock screen never shows.
+const LOCK_ENABLED = false;
+
 // CHANGE THIS to your real password before you start using the app for real.
 // This is a casual deterrent only, not real security (visible in page source).
 const APP_PASSWORD = "02233";
@@ -372,20 +376,21 @@ function todoItemHtml(t, showDate) {
       <button class="todo-check" data-action="toggle" aria-label="Toggle done">
         ${t.done ? "✓" : ""}
       </button>
-      <span class="todo-text">${escapeHtml(t.text)}</span>
-      ${showDate ? `<span class="todo-date-badge">${formatShortDate(t.date)}</span>` : ""}
+      <div class="todo-item-main">
+        <span class="todo-text">${escapeHtml(t.text)}</span>
+        ${showDate ? `<span class="todo-meta">${formatShortDate(t.date)}</span>` : ""}
+      </div>
       <button class="todo-delete" data-action="delete" aria-label="Delete task">✕</button>
     </li>
   `;
 }
 
 let todoView = "list"; // "list" | "calendar"
+let todoFormExpanded = false;
 
 function renderTodo() {
   document.getElementById("page-todo").innerHTML = `
-    <div class="page-header">
-      <h1 class="page-title">To-Do List</h1>
-    </div>
+    <h1 class="page-title">To-Do</h1>
     <div class="seg-control">
       <button class="seg-btn ${todoView === "list" ? "active" : ""}" data-view="list">List</button>
       <button class="seg-btn ${todoView === "calendar" ? "active" : ""}" data-view="calendar">Calendar</button>
@@ -396,6 +401,7 @@ function renderTodo() {
   document.querySelectorAll(".seg-btn").forEach(btn => {
     btn.addEventListener("click", function () {
       todoView = btn.dataset.view;
+      todoFormExpanded = false;
       renderTodo();
     });
   });
@@ -405,10 +411,12 @@ function renderTodo() {
 }
 
 function renderTodoList() {
+  const today = new Date();
   const todayKey = getTodayKey();
   const todayTodos = state.todos.filter(t => t.date <= todayKey);
   const upcomingTodos = state.todos.filter(t => t.date > todayKey).sort((a, b) => a.date.localeCompare(b.date));
   const todosDone = todayTodos.filter(t => t.done).length;
+  const dateHeader = `${MONTHS[today.getMonth()].slice(0, 3)} ${today.getDate()} · Today · ${WEEKDAYS[today.getDay()]}`;
 
   const todayHtml = todayTodos.length
     ? todayTodos.map(t => todoItemHtml(t, false)).join("")
@@ -416,34 +424,68 @@ function renderTodoList() {
 
   const upcomingHtml = upcomingTodos.length
     ? `
-      <h2 class="section-heading todo-section">Upcoming</h2>
+      <h2 class="todo-section-label">Upcoming</h2>
       <ul class="todo-list">${upcomingTodos.map(t => todoItemHtml(t, true)).join("")}</ul>
     `
     : "";
 
-  document.getElementById("todo-view-content").innerHTML = `
-    <p class="page-sub todo-progress">${todosDone}/${todayTodos.length} completed today</p>
+  const addRowHtml = todoFormExpanded
+    ? `
+      <div class="todo-add-card">
+        <form id="todo-form">
+          <input type="text" id="todo-input" class="todo-name-input" placeholder="e.g., Call the supplier" aria-label="Task name" autocomplete="off" maxlength="120" autofocus />
+          <div class="todo-chip-row">
+            <label class="todo-date-chip">
+              ${ICONS.calendar}
+              <span id="todo-date-label">Today</span>
+              <input type="date" id="todo-date" min="${todayKey}" aria-label="Due date (defaults to today)" />
+            </label>
+          </div>
+          <div class="todo-add-actions">
+            <button type="button" id="todo-cancel-btn" class="todo-btn-cancel">Cancel</button>
+            <button type="submit" class="todo-btn-add">Add task</button>
+          </div>
+        </form>
+      </div>
+    `
+    : `<button class="todo-add-trigger" id="todo-add-trigger">+ <span>Add task</span></button>`;
 
-    <form id="todo-form" class="add-form">
-      <input type="text" id="todo-input" placeholder="Add a task..." aria-label="Task description" autocomplete="off" maxlength="120" />
-      <input type="date" id="todo-date" min="${todayKey}" aria-label="Due date (defaults to today)" />
-      <button type="submit">Add</button>
-    </form>
+  document.getElementById("todo-view-content").innerHTML = `
+    <p class="todo-count">${ICONS.check} ${todosDone}/${todayTodos.length} done today</p>
+    <div class="todo-date-divider"><span>${dateHeader}</span></div>
+
+    ${addRowHtml}
 
     <ul class="todo-list">${todayHtml}</ul>
     ${upcomingHtml}
   `;
 
-  document.getElementById("todo-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-    const input = document.getElementById("todo-input");
+  if (todoFormExpanded) {
     const dateInput = document.getElementById("todo-date");
-    const text = input.value.trim();
-    if (!text) return;
-    state.todos.push({ id: uid("t"), text, done: false, date: dateInput.value || todayKey });
-    saveState();
-    renderTodoList();
-  });
+    const dateLabel = document.getElementById("todo-date-label");
+    dateInput.addEventListener("change", function () {
+      dateLabel.textContent = dateInput.value ? formatShortDate(dateInput.value) : "Today";
+    });
+    document.getElementById("todo-cancel-btn").addEventListener("click", function () {
+      todoFormExpanded = false;
+      renderTodoList();
+    });
+    document.getElementById("todo-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const input = document.getElementById("todo-input");
+      const text = input.value.trim();
+      if (!text) return;
+      state.todos.push({ id: uid("t"), text, done: false, date: dateInput.value || todayKey });
+      saveState();
+      todoFormExpanded = false;
+      renderTodoList();
+    });
+  } else {
+    document.getElementById("todo-add-trigger").addEventListener("click", function () {
+      todoFormExpanded = true;
+      renderTodoList();
+    });
+  }
 
   document.getElementById("todo-view-content").addEventListener("click", function (e) {
     const btn = e.target.closest("button[data-action]");
@@ -1009,7 +1051,10 @@ function runSplash() {
     splashView.classList.add("fade-out");
     setTimeout(() => {
       splashView.classList.add("hidden");
-      if (isUnlocked()) {
+      // LOCK_ENABLED is off, so the password gate is skipped entirely and we
+      // go straight to the app. Flip LOCK_ENABLED back to true to restore it
+      // without losing any of the lock-screen code below.
+      if (!LOCK_ENABLED || isUnlocked()) {
         lockView.classList.add("hidden");
         appView.classList.remove("hidden");
         initApp();
