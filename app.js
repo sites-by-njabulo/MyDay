@@ -123,6 +123,19 @@ function ensureDayRecord(dateKey) {
   return state.days[dateKey];
 }
 
+// Guarantees the faith/workout reset is visible even if the app is left open
+// straight through midnight with no interaction (ensureDayRecord is otherwise
+// lazy — it only fires on the next render). Re-arms itself every 24h.
+function armMidnightWatcher() {
+  const now = new Date();
+  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  setTimeout(function () {
+    ensureDayRecord(getTodayKey());
+    renderSection(currentSectionName);
+    armMidnightWatcher();
+  }, nextMidnight - now);
+}
+
 function uid(prefix) {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 }
@@ -224,8 +237,10 @@ lockForm.addEventListener("submit", function (e) {
    4. NAV ROUTER
    ========================================================== */
 const mainNav = document.getElementById("main-nav");
+let currentSectionName = "home";
 
 function showSection(name) {
+  currentSectionName = name;
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.dataset.page === name));
   const navTarget = (name === "settings" || name === "video") ? "you" : name;
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === navTarget));
@@ -1259,6 +1274,7 @@ function initApp() {
   document.getElementById("todo-fab").addEventListener("click", openTodoSheet);
   showSection("home");
   registerServiceWorker();
+  armMidnightWatcher();
 }
 
 function runSplash() {
