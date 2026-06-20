@@ -6,7 +6,7 @@ Personal daily life management PWA. Vanilla HTML/CSS/JS, no build step, no frame
 
 - `index.html` / `styles.css` / `app.js` — single-page app, section-based router.
 - `data/verses.js`, `data/quotes.js` — 30 entries each, cycle by `(date.getDate() - 1) % 30`.
-- `manifest.json` + `sw.js` — PWA installability + offline app shell caching.
+- `manifest.json` + `sw.js` — PWA installability + offline app shell caching. The fetch handler is **network-first**: every load tries the network for the latest deployed files first and only falls back to the cache when offline. (It used to be cache-first, which silently kept serving stale `app.js`/`styles.css` after every deploy unless `sw.js` itself also changed bytes — bumping `CACHE_NAME` is no longer required for a deploy to take effect, only useful to force the offline-fallback cache to refresh.)
 - `.github/workflows/reminders.yml` — sends the daily push reminders via OneSignal's REST API on a cron schedule.
 
 ## Palette & Typography

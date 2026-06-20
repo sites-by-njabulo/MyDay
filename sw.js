@@ -1,6 +1,6 @@
 importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
 
-const CACHE_NAME = "myday-v3";
+const CACHE_NAME = "myday-v4";
 const STATIC_ASSETS = [
   "./",
   "./index.html",
@@ -29,16 +29,19 @@ self.addEventListener("activate", function (event) {
   );
 });
 
+// Network-first: always try to fetch the latest deployed version first, and
+// only fall back to the cache when offline. This is the opposite of the old
+// cache-first strategy, which kept serving stale app.js/styles.css forever
+// after a deploy unless sw.js itself happened to change bytes too (the
+// install/activate handlers only re-run when the SW script changes, so a
+// content-only deploy with no sw.js edit never refreshed the cache).
 self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        return response;
-      }).catch(() => cached);
-    })
+    fetch(event.request).then(response => {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
