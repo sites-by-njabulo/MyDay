@@ -1289,19 +1289,17 @@ function notesFoldersPaneHtml() {
   return `
     <div class="notes-folders-pane">
       <div class="notes-pane-header">
-        <h2 class="notes-pane-title">My Notes</h2>
+        <h2 class="notes-pane-title">Notes</h2>
         <button class="notes-icon-btn" id="notes-add-folder" aria-label="New folder">+</button>
       </div>
       <div class="notes-search">
         ${ICONS.search}
         <input type="text" id="notes-search-input" placeholder="Search all notes" value="${escapeHtml(notesSearchQuery)}" autocomplete="off" />
       </div>
+      <button class="notes-folder-row notes-all-notes-row ${activeFolderId === null ? "active" : ""}" data-folder="all">
+        ${ICONS.notes}<span class="notes-folder-name">All Notes</span><span class="notes-folder-count">${allCount}</span>
+      </button>
       <ul class="notes-folder-list">
-        <li>
-          <button class="notes-folder-row ${activeFolderId === null ? "active" : ""}" data-folder="all">
-            ${ICONS.notes}<span class="notes-folder-name">All Notes</span><span class="notes-folder-count">${allCount}</span>
-          </button>
-        </li>
         ${folderRows}
       </ul>
     </div>

@@ -1553,8 +1553,10 @@ button, input { font-family: inherit; }
 }
 .notes-folder-row svg { width: 17px; height: 17px; flex: none; color: var(--text-secondary); }
 .notes-folder-row:hover { background: var(--surface-3); }
-.notes-folder-row.active { background: var(--accent-soft); color: var(--accent); }
-.notes-folder-row.active svg { color: var(--accent); }
+.notes-folder-row.active { background: var(--accent); color: #fff; }
+.notes-folder-row.active svg { color: #fff; }
+.notes-folder-row.active .notes-folder-count { color: rgba(255, 255, 255, 0.75); }
+.notes-all-notes-row { width: 100%; margin-bottom: 10px; }
 .notes-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notes-folder-count { font-size: 12px; font-weight: 600; color: var(--text-secondary); flex: none; }
 .notes-folder-delete {
@@ -1667,16 +1669,58 @@ button, input { font-family: inherit; }
 .notes-editor-empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 60px 10px; }
 
 @media (min-width: 769px) {
+  /* Notes is the one page that escapes #main-content's normal padded reading
+     column entirely — it must span the exact same full height as the fixed
+     sidebar nav, with all three panels flush against each other, matching
+     iCloud Notes rather than the rest of MyDay's card-grid pages. */
+  #main-content:has(.notes-layout) {
+    max-width: none;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #page-notes.active { height: 100%; }
+
+  .notes-layout {
+    height: 100%;
+    align-items: stretch;
+    gap: 0;
+  }
   .notes-layout[data-mobile-view] .notes-folders-pane,
   .notes-layout[data-mobile-view] .notes-list-pane,
   .notes-layout[data-mobile-view] .notes-editor-pane {
-    display: block;
+    display: flex;
   }
+  .notes-folders-pane, .notes-list-pane, .notes-editor-pane {
+    height: 100%;
+    flex-direction: column;
+    border: none;
+    border-right: 1px solid var(--border);
+    border-radius: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .notes-editor-pane { border-right: none; }
   .notes-folders-pane { flex: 0 0 240px; }
-  .notes-list-pane { flex: 0 0 280px; }
+  .notes-list-pane { flex: 0 0 300px; }
   .notes-editor-pane { flex: 1 1 auto; min-width: 0; }
+
+  /* Each pane: header (and search/title/toolbar) pinned, one scrollable region below. */
+  .notes-folders-pane .notes-pane-header { flex: none; padding: 20px 16px 14px; margin-bottom: 0; }
+  .notes-folders-pane .notes-search { flex: none; margin: 0 16px 12px; }
+  .notes-folders-pane .notes-all-notes-row { flex: none; margin: 0 10px 8px; }
+  .notes-folder-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: 0 10px 20px; }
+
+  .notes-list-pane .notes-pane-header { flex: none; padding: 20px 16px 14px; margin-bottom: 0; }
+  .notes-list-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: 0 10px 20px; }
+
+  .notes-editor-pane .notes-pane-header { flex: none; padding: 16px 24px 0; margin-bottom: 0; }
+  .notes-editor-pane .note-title-input { flex: none; margin: 16px 24px 10px; width: auto; }
+  .notes-editor-pane .note-toolbar { flex: none; margin: 0 24px 14px; }
+  .note-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 24px 40px; }
+  .notes-editor-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: 0; }
+
   .notes-back-btn { display: none; }
-  #main-content:has(.notes-layout) { max-width: 1180px; }
 }
 
 /* ===== Settings ===== */
