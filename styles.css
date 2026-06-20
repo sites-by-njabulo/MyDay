@@ -42,6 +42,9 @@
   --space-6: 32px;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
   --nav-w: 248px;
   --nav-h-mobile: 76px;
@@ -139,12 +142,33 @@ button, input { font-family: inherit; }
   border-radius: var(--radius-lg);
   padding: 40px 32px;
   text-align: center;
+  animation: lockCardIn 0.6s var(--ease-out-expo) both;
+}
+/* Plays once when the lock view becomes visible (display:none -> flex resets
+   the animation), not on every interaction inside the card. */
+@keyframes lockCardIn {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.lock-card.unlock-success {
+  animation: unlockPulse 0.38s var(--ease-out-quint) forwards;
+}
+@keyframes unlockPulse {
+  0% { transform: scale(1); opacity: 1; }
+  45% { transform: scale(1.025); opacity: 1; }
+  100% { transform: scale(0.96); opacity: 0; }
 }
 .lock-mark {
   width: 48px;
   height: auto;
   margin: 0 auto 18px;
   display: block;
+  animation: lockMarkIn 0.5s var(--ease-out-expo) both;
+  animation-delay: 0.08s;
+}
+@keyframes lockMarkIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* The logo is a light/white asset designed for dark surfaces; invert it on
@@ -159,11 +183,19 @@ button, input { font-family: inherit; }
   font-size: 24px;
   font-weight: 800;
   color: var(--text-primary);
+  animation: lockFadeUp 0.5s var(--ease-out-expo) both;
+  animation-delay: 0.12s;
 }
 .lock-sub {
   margin: 0 0 24px;
   font-size: 14px;
   color: var(--text-secondary);
+  animation: lockFadeUp 0.5s var(--ease-out-expo) both;
+  animation-delay: 0.16s;
+}
+@keyframes lockFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 #lock-form {
   display: flex;
@@ -171,17 +203,23 @@ button, input { font-family: inherit; }
   gap: 12px;
 }
 #lock-input {
-  border: 1px solid var(--border);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 14px 16px;
   font-size: 15px;
   outline: none;
   background: var(--input-bg);
   color: var(--text-primary);
-  transition: border-color 0.15s ease;
+  transition: border-color 0.2s var(--ease-out-quart);
+  animation: lockFadeUp 0.5s var(--ease-out-expo) both;
+  animation-delay: 0.22s;
 }
 #lock-input:focus {
   border-color: var(--accent);
+}
+#lock-input.error {
+  border-color: var(--danger);
+  animation: inputShake 0.4s var(--ease-out-quart);
 }
 #lock-form button {
   border: none;
@@ -192,26 +230,27 @@ button, input { font-family: inherit; }
   color: var(--text-primary);
   background: var(--accent);
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background 0.2s var(--ease-out-quart), transform 0.15s var(--ease-out-quart);
+  animation: lockFadeUp 0.5s var(--ease-out-expo) both;
+  animation-delay: 0.28s;
 }
-#lock-form button:hover { background: var(--accent-hover); }
-#lock-form button:active { transform: scale(0.98); }
+#lock-form button:hover { background: var(--accent-hover); transform: scale(1.015); }
+#lock-form button:active { transform: scale(0.97); }
 .lock-error {
   margin: 14px 0 0;
   font-size: 13px;
   color: var(--danger);
   font-weight: 600;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.2s var(--ease-out-quart);
 }
 .lock-error.show { opacity: 1; }
-.lock-card.shake { animation: shake 0.4s ease; }
-@keyframes shake {
+@keyframes inputShake {
   0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-6px); }
-  80% { transform: translateX(6px); }
+  20% { transform: translateX(-7px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
 }
 
 /* ===== App shell ===== */
@@ -226,6 +265,15 @@ button, input { font-family: inherit; }
   max-width: 880px;
   margin: 0 auto;
   width: 100%;
+  animation: contentReveal 0.6s var(--ease-out-expo) both;
+  animation-delay: 0.1s;
+}
+/* "App opening up": the nav settles into place first, content fills in just
+   after. Both replay naturally whenever #app-view goes from hidden to shown
+   (display:none unmounts the animation, so it restarts on every reveal). */
+@keyframes contentReveal {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .page { display: none; }
@@ -289,6 +337,15 @@ button, input { font-family: inherit; }
   padding: 6px 8px;
   z-index: 50;
   overflow: visible;
+  animation: navRevealUp 0.55s var(--ease-out-expo) both;
+}
+@keyframes navRevealUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes navRevealLeft {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 [data-theme="light"] #main-nav { background: rgba(255, 255, 255, 0.72); }
 .nav-brand { display: none; }
@@ -308,8 +365,9 @@ button, input { font-family: inherit; }
   border-radius: var(--radius-pill);
   cursor: pointer;
   color: var(--text-secondary);
-  transition: color 0.15s ease;
+  transition: color 0.2s var(--ease-out-quart), transform 0.15s var(--ease-out-quart);
 }
+.nav-item:active { transform: scale(0.92); }
 .nav-icon { line-height: 1; display: flex; }
 .nav-icon svg { width: 20px; height: 20px; }
 .nav-avatar {
@@ -366,6 +424,7 @@ button, input { font-family: inherit; }
     gap: 2px;
     overflow-x: visible;
     backdrop-filter: none;
+    animation: navRevealLeft 0.55s var(--ease-out-expo) both;
   }
   .nav-brand {
     display: flex;
@@ -579,7 +638,7 @@ button, input { font-family: inherit; }
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 14px 14px 12px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s var(--ease-out-quart), background 0.15s var(--ease-out-quart);
 }
 .overview-chip.done {
   border-color: var(--accent);
@@ -640,7 +699,7 @@ button, input { font-family: inherit; }
   color: var(--text-secondary);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart);
 }
 .seg-btn.active { background: var(--card-bg); color: var(--text-primary); }
 
@@ -662,7 +721,7 @@ button, input { font-family: inherit; }
   background: var(--input-bg);
   color: var(--text-primary);
   outline: none;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s var(--ease-out-quart);
 }
 .add-form input[type="date"] { flex: 0 0 150px; color-scheme: dark; }
 [data-theme="light"] .add-form input[type="date"] { color-scheme: light; }
@@ -677,7 +736,7 @@ button, input { font-family: inherit; }
   background: var(--accent);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s var(--ease-out-quart), transform 0.1s var(--ease-out-quart);
 }
 .add-form button:hover { background: var(--accent-hover); }
 .add-form button:active { transform: scale(0.97); }
@@ -700,7 +759,7 @@ button, input { font-family: inherit; }
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 14px 14px;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s var(--ease-out-quart);
 }
 .todo-check {
   flex: none;
@@ -716,7 +775,7 @@ button, input { font-family: inherit; }
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s var(--ease-out-quart), border-color 0.15s var(--ease-out-quart);
 }
 .todo-check:hover {
   border-color: var(--accent);
@@ -754,7 +813,7 @@ button, input { font-family: inherit; }
   cursor: pointer;
   padding: 6px;
   border-radius: 50%;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.15s var(--ease-out-quart), background 0.15s var(--ease-out-quart);
 }
 .todo-delete:hover { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
 .todo-empty {
@@ -785,7 +844,7 @@ button, input { font-family: inherit; }
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+  transition: border-color 0.15s var(--ease-out-quart), background 0.15s var(--ease-out-quart), transform 0.1s var(--ease-out-quart);
 }
 .faith-card:active { transform: scale(0.97); }
 .faith-card:hover { border-color: var(--accent); }
@@ -817,7 +876,7 @@ button, input { font-family: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart);
 }
 .faith-undo:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .faith-undo:disabled { opacity: 0.35; cursor: default; }
@@ -866,7 +925,7 @@ button, input { font-family: inherit; }
   border-radius: var(--radius-sm);
   padding: 9px 14px;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s var(--ease-out-quart), border-color 0.15s var(--ease-out-quart), transform 0.1s var(--ease-out-quart);
 }
 .quick-add:active { transform: scale(0.95); }
 .quick-add:hover { border-color: var(--accent); color: var(--accent); }
@@ -906,7 +965,7 @@ button, input { font-family: inherit; }
   padding: 14px 22px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s var(--ease-out-quart);
 }
 .challenge-start-card button:hover { background: var(--accent-hover); }
 
@@ -1048,7 +1107,7 @@ button, input { font-family: inherit; }
   padding: 10px 0 14px;
   border-radius: 10px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s var(--ease-out-quart);
 }
 .cal-cell:hover { background: var(--input-bg); }
 .cal-cell.muted { color: var(--text-secondary); opacity: 0.45; }
@@ -1152,7 +1211,7 @@ button, input { font-family: inherit; }
   color: var(--text-primary);
   background: var(--input-bg);
   color-scheme: dark;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s var(--ease-out-quart);
 }
 [data-theme="light"] .settings-list-row input[type="time"] { color-scheme: light; }
 .settings-list-row input[type="time"]:focus { border-color: var(--accent); outline: none; }
@@ -1164,7 +1223,7 @@ button, input { font-family: inherit; }
   background: var(--border);
   position: relative;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s var(--ease-out-quart);
   flex: none;
 }
 .toggle-pill.on { background: var(--accent); }

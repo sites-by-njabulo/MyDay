@@ -125,17 +125,43 @@ function ring(pct, size, stroke, centerHtml) {
   const c = 2 * Math.PI * r;
   const offset = c * (1 - clamped / 100);
   const cx = size / 2, cy = size / 2;
+  // Fill starts fully empty (dashoffset = circumference); animateRings() below
+  // tweens it to data-target-offset so the ring sweeps in instead of appearing
+  // already-filled.
   return `
     <div class="ring" style="width:${size}px;height:${size}px">
       <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
         <circle class="ring-track" cx="${cx}" cy="${cy}" r="${r}" stroke-width="${stroke}" fill="none"/>
         <circle class="ring-fill" cx="${cx}" cy="${cy}" r="${r}" stroke-width="${stroke}" fill="none"
-          stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"
+          stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${c.toFixed(2)}"
+          data-target-offset="${offset.toFixed(2)}"
           transform="rotate(-90 ${cx} ${cy})"/>
       </svg>
       ${centerHtml ? `<div class="ring-center">${centerHtml}</div>` : ""}
     </div>
   `;
+}
+
+// Sweeps every ring inside `container` from empty to its real value, each one
+// starting slightly after the previous (cascading reveal). Skips straight to
+// the final state when the user prefers reduced motion, or when `instant` is
+// requested (e.g. a quick-add click updating a ring that's already on screen
+// — re-sweeping from zero on every tap would look like lost progress).
+function animateRings(container, { instant = false } = {}) {
+  const fills = container.querySelectorAll(".ring-fill");
+  const reduceMotion = instant || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  fills.forEach((el, i) => {
+    const from = parseFloat(el.getAttribute("stroke-dashoffset"));
+    const to = parseFloat(el.dataset.targetOffset);
+    if (reduceMotion) {
+      el.style.strokeDashoffset = to;
+      return;
+    }
+    el.animate(
+      [{ strokeDashoffset: from }, { strokeDashoffset: to }],
+      { duration: 700, delay: i * 90, easing: "cubic-bezier(0.25, 1, 0.5, 1)", fill: "forwards" }
+    );
+  });
 }
 
 /* ==========================================================
@@ -155,12 +181,17 @@ function isUnlocked() {
 
 function unlockApp() {
   sessionStorage.setItem(SESSION_UNLOCK_KEY, "true");
-  lockView.classList.add("hidden");
-  appView.classList.remove("hidden");
-  initApp();
+  // Let the success pulse play before cutting to the app, instead of an instant swap.
+  lockCard.classList.add("unlock-success");
+  setTimeout(() => {
+    lockView.classList.add("hidden");
+    appView.classList.remove("hidden");
+    initApp();
+  }, 380); // matches .unlock-success animation duration
 }
 
 function showLock() {
+  lockCard.classList.remove("unlock-success");
   lockView.classList.remove("hidden");
   appView.classList.add("hidden");
 }
@@ -172,8 +203,9 @@ lockForm.addEventListener("submit", function (e) {
     unlockApp();
   } else {
     lockError.classList.add("show");
-    lockCard.classList.remove("shake");
-    requestAnimationFrame(() => lockCard.classList.add("shake"));
+    lockInput.classList.remove("error");
+    requestAnimationFrame(() => lockInput.classList.add("error"));
+    setTimeout(() => lockInput.classList.remove("error"), 400);
     lockInput.value = "";
     lockInput.focus();
   }
@@ -322,6 +354,8 @@ function renderHomeToday() {
       </div>
     </div>
   `;
+
+  animateRings(document.getElementById("home-tab-content"));
 }
 
 /* ==========================================================
@@ -508,7 +542,7 @@ function workoutCardHtml(key, label, icon, data) {
   `;
 }
 
-function renderWorkout() {
+function renderWorkout(skipRingAnimation = false) {
   const day = ensureDayRecord(getTodayKey());
 
   document.getElementById("page-workout").innerHTML = `
@@ -529,9 +563,11 @@ function renderWorkout() {
         day.workout[key].count += parseInt(btn.dataset.amount, 10);
       }
       saveState();
-      renderWorkout();
+      renderWorkout(true);
     });
   });
+
+  animateRings(document.getElementById("page-workout"), { instant: skipRingAnimation });
 }
 
 /* ==========================================================
@@ -615,7 +651,7 @@ function getChallengeStats() {
   return { started: true, daysRemaining, dayNumber, totalEarned, pct };
 }
 
-function renderChallenge(targetId = "page-challenge") {
+function renderChallenge(targetId = "page-challenge", skipRingAnimation = false) {
   const c = state.challenge;
 
   if (!c.startDate) {
@@ -694,7 +730,7 @@ function renderChallenge(targetId = "page-challenge") {
     if (!amount || amount <= 0) return;
     c.entries.push({ id: uid("e"), amount, description: descInput.value.trim(), date: getTodayKey() });
     saveState();
-    renderChallenge(targetId);
+    renderChallenge(targetId, true);
   });
 
   document.querySelector(".entry-list").addEventListener("click", function (e) {
@@ -703,8 +739,10 @@ function renderChallenge(targetId = "page-challenge") {
     const id = btn.closest(".entry-item").dataset.id;
     c.entries = c.entries.filter(e => e.id !== id);
     saveState();
-    renderChallenge(targetId);
+    renderChallenge(targetId, true);
   });
+
+  animateRings(document.getElementById(targetId), { instant: skipRingAnimation });
 }
 
 /* ==========================================================
@@ -849,6 +887,8 @@ function renderYou() {
       }
     });
   });
+
+  animateRings(document.getElementById("page-you"));
 }
 
 /* ==========================================================
