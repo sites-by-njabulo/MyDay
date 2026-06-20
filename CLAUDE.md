@@ -37,7 +37,7 @@ Font: Inter, used everywhere including the Bible verse callout (no serif). Icons
       "workout": { "pushups": {"count":0,"goal":200}, "curls": {"count":0,"goal":100} }
     }
   },
-  "todos": [{ "id": "", "text": "", "done": false, "date": "YYYY-MM-DD" }],
+  "todos": [{ "id": "", "text": "", "done": false, "date": "YYYY-MM-DD", "description": "", "priority": null, "time": null }],
   "videoPlan": [{ "id": "", "url": "", "watched": false, "addedAt": "" }],
   "challenge": { "startDate": null, "targetAmount": 10000, "durationDays": 60, "entries": [{ "id": "", "amount": 0, "description": "", "date": "" }] },
   "settings": { "prayerReminderTime": "07:00", "workoutReminderTime": "18:00" }
@@ -47,6 +47,21 @@ Font: Inter, used everywhere including the Bible verse callout (no serif). Icons
 - `days["YYYY-MM-DD"]` is created lazily by `ensureDayRecord()` — the entire daily-reset mechanism for faith/workout, no cron needed client-side.
 - `todos` is a flat, root-level array (not nested per day). Each item carries its own `date`. The To-Do page buckets `date <= today` into "Today" (this also surfaces overdue, undone tasks) and `date > today` into "Upcoming". The Calendar page reads this same array to show dots and the day-detail panel.
 - `faith.prayerCount` is an incrementing counter (tap to log each prayer), not a boolean — prayer happens multiple times a day. `bibleReadingDone` stays a simple boolean.
+- `todos[].description`/`priority`/`time` are optional (older saved todos simply lack them, read safely as falsy). `priority` is `null|"low"|"med"|"high"`, shown as a colored dot on the task row. `time` is `"HH:MM"|null`. `armMidnightWatcher()` (region 4) re-renders the active section right after local midnight so faith/workout counters visibly reset even if the app was left open straight through it — `ensureDayRecord()` alone only resets lazily, on the next render.
+
+## localStorage shape (`myday_notes`) — separate key, never touched by the daily reset
+
+```json
+{
+  "schemaVersion": 1,
+  "folders": [{ "id": "", "name": "", "createdAt": 0 }],
+  "notes": [{ "id": "", "folderId": null, "title": "", "bodyHtml": "", "createdAt": 0, "updatedAt": 0 }]
+}
+```
+
+- `folderId: null` means unfiled — visible only under "All Notes". Deleting a folder un-files its notes rather than deleting them.
+- `bodyHtml` is the note editor's raw `contenteditable` `innerHTML` (formatted via `document.execCommand` for bold/italic/underline/strike/headings/lists; checklists are a hand-inserted `<ul class="note-checklist">`). This is a deliberate simplification, not a structured document model.
+- Desktop renders all 3 Notes panes (folders/list/editor) at once; mobile drill-down (`notesView`: `"folders"|"list"|"editor"`) shows one at a time via `.notes-layout[data-mobile-view]` in `styles.css`, same DOM either way.
 - `migrateState()` in `app.js` (region 2) upgrades older saved data on load: flattens any old nested `day.todos` into the root `todos` array, and converts old `faith.prayerDone` booleans into `prayerCount` (0 or 1). Safe to run repeatedly; only touches days that still have the old shape.
 - `getChallengeStats()` (region 10) is the single source of truth for days-remaining/total-earned/progress — used by both the read-only Home summary card and the full Challenge page so they never drift out of sync.
 

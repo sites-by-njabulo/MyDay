@@ -37,7 +37,12 @@ const ICONS = {
   flag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v17"/><path d="M5 4.5c2-1.2 4-1.2 6 0s4 1.2 6 0v9c-2 1.2-4 1.2-6 0s-4-1.2-6 0z"/></svg>`,
   clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`,
   repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.2M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-14 5.2M4 20v-4h4"/></svg>`,
-  notes: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`
+  notes: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`,
+  folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4l2 2h8.5A1.5 1.5 0 0 1 20.5 8.5v9A1.5 1.5 0 0 1 19 19H4.5A1.5 1.5 0 0 1 3 17.5z"/></svg>`,
+  search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>`,
+  listBullet: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>`,
+  listNumber: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="1.5" y="8.5" font-size="6.5" fill="currentColor" stroke="none">1</text><text x="1.5" y="14.5" font-size="6.5" fill="currentColor" stroke="none">2</text><text x="1.5" y="20.5" font-size="6.5" fill="currentColor" stroke="none">3</text><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>`,
+  newNote: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
 };
 
 /* ==========================================================
@@ -260,6 +265,7 @@ function renderSection(name) {
     case "faith": renderFaith(); break;
     case "workout": renderWorkout(); break;
     case "video": renderVideoPlan(); break;
+    case "notes": renderNotes(); break;
     case "you": renderYou(); break;
     case "settings": renderSettings(); break;
   }
@@ -1163,7 +1169,317 @@ function renderYou() {
 }
 
 /* ==========================================================
-   13. SETTINGS
+   13. NOTES
+   ========================================================== */
+// Separate localStorage key — Notes data is independent of myday_state and
+// must never be touched by the daily-reset / midnight-watcher logic above.
+const NOTES_STORAGE_KEY = "myday_notes";
+
+function defaultNotesData() {
+  return { schemaVersion: 1, folders: [], notes: [] };
+}
+
+function loadNotesData() {
+  try {
+    const raw = localStorage.getItem(NOTES_STORAGE_KEY);
+    if (!raw) return defaultNotesData();
+    return Object.assign(defaultNotesData(), JSON.parse(raw));
+  } catch (e) {
+    console.error("Failed to load notes, resetting.", e);
+    return defaultNotesData();
+  }
+}
+
+let notesData = loadNotesData();
+
+function saveNotesData() {
+  localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesData));
+}
+
+let notesView = "folders"; // mobile drill-down only: "folders" | "list" | "editor"
+let activeFolderId = null; // null = "All Notes"
+let activeNoteId = null;
+let notesSearchQuery = "";
+
+function stripHtml(html) {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return div.textContent || "";
+}
+
+function notePreview(note) {
+  return stripHtml(note.bodyHtml).trim().replace(/\s+/g, " ").slice(0, 90);
+}
+
+function formatNoteDate(ts) {
+  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function notesInFolder(folderId) {
+  let list = notesData.notes;
+  if (folderId !== null) list = list.filter(n => n.folderId === folderId);
+  const q = notesSearchQuery.trim().toLowerCase();
+  if (q) list = list.filter(n => n.title.toLowerCase().includes(q) || stripHtml(n.bodyHtml).toLowerCase().includes(q));
+  return list.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function createNote(folderId) {
+  const note = { id: uid("n"), folderId, title: "", bodyHtml: "", createdAt: Date.now(), updatedAt: Date.now() };
+  notesData.notes.unshift(note);
+  saveNotesData();
+  return note;
+}
+
+function createFolder(name) {
+  const folder = { id: uid("f"), name, createdAt: Date.now() };
+  notesData.folders.push(folder);
+  saveNotesData();
+  return folder;
+}
+
+function deleteFolder(folderId) {
+  notesData.notes.forEach(n => { if (n.folderId === folderId) n.folderId = null; });
+  notesData.folders = notesData.folders.filter(f => f.id !== folderId);
+  saveNotesData();
+}
+
+function renderNotes() {
+  const visibleNotes = notesInFolder(activeFolderId);
+  if (!activeNoteId || !visibleNotes.some(n => n.id === activeNoteId)) {
+    activeNoteId = visibleNotes.length ? visibleNotes[0].id : null;
+  }
+  document.getElementById("page-notes").innerHTML = `
+    <div class="notes-layout" id="notes-layout" data-mobile-view="${notesView}">
+      ${notesFoldersPaneHtml()}
+      ${notesListPaneHtml(visibleNotes)}
+      ${notesEditorPaneHtml()}
+    </div>
+  `;
+  attachNotesFolderEvents();
+  attachNotesListEvents();
+  attachNotesEditorEvents();
+}
+
+function notesFoldersPaneHtml() {
+  const allCount = notesData.notes.length;
+  const folderRows = notesData.folders.map(f => {
+    const count = notesData.notes.filter(n => n.folderId === f.id).length;
+    return `
+      <li class="notes-folder-item">
+        <button class="notes-folder-row ${activeFolderId === f.id ? "active" : ""}" data-folder="${f.id}">
+          ${ICONS.folder}<span class="notes-folder-name">${escapeHtml(f.name)}</span><span class="notes-folder-count">${count}</span>
+        </button>
+        <button class="notes-folder-delete" data-delete-folder="${f.id}" aria-label="Delete folder">✕</button>
+      </li>
+    `;
+  }).join("");
+
+  return `
+    <div class="notes-folders-pane">
+      <div class="notes-pane-header">
+        <h2 class="notes-pane-title">My Notes</h2>
+        <button class="notes-icon-btn" id="notes-add-folder" aria-label="New folder">+</button>
+      </div>
+      <div class="notes-search">
+        ${ICONS.search}
+        <input type="text" id="notes-search-input" placeholder="Search all notes" value="${escapeHtml(notesSearchQuery)}" autocomplete="off" />
+      </div>
+      <ul class="notes-folder-list">
+        <li>
+          <button class="notes-folder-row ${activeFolderId === null ? "active" : ""}" data-folder="all">
+            ${ICONS.notes}<span class="notes-folder-name">All Notes</span><span class="notes-folder-count">${allCount}</span>
+          </button>
+        </li>
+        ${folderRows}
+      </ul>
+    </div>
+  `;
+}
+
+function notesListPaneHtml(visibleNotes) {
+  const folder = activeFolderId ? notesData.folders.find(f => f.id === activeFolderId) : null;
+  const folderLabel = folder ? folder.name : "All Notes";
+  const rowsHtml = visibleNotes.length
+    ? visibleNotes.map(n => `
+      <li>
+        <button class="notes-list-row ${activeNoteId === n.id ? "active" : ""}" data-id="${n.id}">
+          <span class="notes-row-top"><span class="notes-row-title">${escapeHtml(n.title) || "New Note"}</span><span class="notes-row-date">${formatNoteDate(n.updatedAt)}</span></span>
+          <span class="notes-row-preview">${escapeHtml(notePreview(n)) || "No additional text"}</span>
+        </button>
+      </li>
+    `).join("")
+    : `<li class="notes-empty">No notes here yet.</li>`;
+
+  return `
+    <div class="notes-list-pane">
+      <div class="notes-pane-header">
+        <button class="notes-back-btn" id="notes-back-to-folders" aria-label="Back">${ICONS.chevronLeft}</button>
+        <h2 class="notes-pane-title">${escapeHtml(folderLabel)}</h2>
+        <span class="notes-topbar-spacer"></span>
+      </div>
+      <ul class="notes-list-rows">${rowsHtml}</ul>
+    </div>
+  `;
+}
+
+function notesEditorPaneHtml() {
+  const note = activeNoteId ? notesData.notes.find(n => n.id === activeNoteId) : null;
+  return `
+    <div class="notes-editor-pane">
+      <div class="notes-pane-header">
+        <button class="notes-back-btn" id="notes-back-to-list" aria-label="Back">${ICONS.chevronLeft}</button>
+        <span class="notes-topbar-spacer"></span>
+        <button class="notes-icon-btn" id="notes-new-note" aria-label="New note">${ICONS.newNote}</button>
+      </div>
+      ${note ? `
+        <input type="text" id="note-title-input" class="note-title-input" placeholder="Title" value="${escapeHtml(note.title)}" autocomplete="off" />
+        <div class="note-toolbar">
+          <div class="note-toolbar-row">
+            <button type="button" data-cmd="bold" aria-label="Bold"><b>B</b></button>
+            <button type="button" data-cmd="italic" aria-label="Italic"><i>I</i></button>
+            <button type="button" data-cmd="underline" aria-label="Underline"><u>U</u></button>
+            <button type="button" data-cmd="strikeThrough" aria-label="Strikethrough"><s>S</s></button>
+          </div>
+          <div class="note-toolbar-divider"></div>
+          <div class="note-toolbar-row">
+            <button type="button" data-cmd="formatBlock" data-val="H1">Title</button>
+            <button type="button" data-cmd="formatBlock" data-val="H2">Heading</button>
+            <button type="button" data-cmd="formatBlock" data-val="H3">Subheading</button>
+            <button type="button" data-cmd="formatBlock" data-val="P">Body</button>
+            <button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list">${ICONS.listBullet}</button>
+            <button type="button" data-cmd="insertOrderedList" aria-label="Numbered list">${ICONS.listNumber}</button>
+            <button type="button" data-action="checklist" aria-label="Checklist">${ICONS.check}</button>
+          </div>
+        </div>
+        <div class="note-body" id="note-body" contenteditable="true">${note.bodyHtml}</div>
+      ` : `
+        <div class="notes-editor-empty">
+          <p>No note selected.</p>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function updateNoteListRowInPlace(note) {
+  const row = document.querySelector(`.notes-list-row[data-id="${note.id}"]`);
+  if (!row) return;
+  row.querySelector(".notes-row-title").textContent = note.title || "New Note";
+  row.querySelector(".notes-row-date").textContent = formatNoteDate(note.updatedAt);
+  row.querySelector(".notes-row-preview").textContent = notePreview(note) || "No additional text";
+}
+
+function attachNotesFolderEvents() {
+  document.querySelectorAll(".notes-folder-row").forEach(btn => {
+    btn.addEventListener("click", function () {
+      activeFolderId = btn.dataset.folder === "all" ? null : btn.dataset.folder;
+      notesView = "list";
+      renderNotes();
+    });
+  });
+
+  document.querySelectorAll(".notes-folder-delete").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const folderId = btn.dataset.deleteFolder;
+      if (!confirm("Delete this folder? Its notes will move to All Notes.")) return;
+      deleteFolder(folderId);
+      if (activeFolderId === folderId) activeFolderId = null;
+      renderNotes();
+    });
+  });
+
+  document.getElementById("notes-add-folder").addEventListener("click", function () {
+    const name = prompt("Folder name");
+    if (!name || !name.trim()) return;
+    const folder = createFolder(name.trim());
+    activeFolderId = folder.id;
+    notesView = "list";
+    renderNotes();
+  });
+
+  const searchInput = document.getElementById("notes-search-input");
+  searchInput.addEventListener("input", function () {
+    notesSearchQuery = searchInput.value;
+    rerenderNotesListAndEditor();
+  });
+}
+
+function attachNotesListEvents() {
+  document.getElementById("notes-back-to-folders").addEventListener("click", function () {
+    notesView = "folders";
+    renderNotes();
+  });
+  document.querySelectorAll(".notes-list-row").forEach(btn => {
+    btn.addEventListener("click", function () {
+      activeNoteId = btn.dataset.id;
+      notesView = "editor";
+      renderNotes();
+    });
+  });
+}
+
+function attachNotesEditorEvents() {
+  document.getElementById("notes-back-to-list").addEventListener("click", function () {
+    notesView = "list";
+    renderNotes();
+  });
+  document.getElementById("notes-new-note").addEventListener("click", function () {
+    const note = createNote(activeFolderId);
+    activeNoteId = note.id;
+    notesView = "editor";
+    renderNotes();
+    const titleInput = document.getElementById("note-title-input");
+    if (titleInput) titleInput.focus();
+  });
+
+  const titleInput = document.getElementById("note-title-input");
+  const body = document.getElementById("note-body");
+  if (!titleInput || !body) return;
+
+  const note = notesData.notes.find(n => n.id === activeNoteId);
+
+  function persist() {
+    note.title = titleInput.value;
+    note.bodyHtml = body.innerHTML;
+    note.updatedAt = Date.now();
+    saveNotesData();
+    updateNoteListRowInPlace(note);
+  }
+
+  titleInput.addEventListener("input", persist);
+  body.addEventListener("input", persist);
+
+  document.querySelectorAll(".note-toolbar button[data-cmd]").forEach(btn => {
+    btn.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      document.execCommand(btn.dataset.cmd, false, btn.dataset.val || null);
+      persist();
+    });
+  });
+  document.querySelector('.note-toolbar button[data-action="checklist"]').addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    body.focus();
+    document.execCommand("insertHTML", false, '<ul class="note-checklist"><li><input type="checkbox">List item</li></ul>');
+    persist();
+  });
+}
+
+// Search re-renders only the list + editor panes, never the folders pane,
+// so the search input itself (which lives in the folders pane) keeps focus
+// while the user types.
+function rerenderNotesListAndEditor() {
+  const visibleNotes = notesInFolder(activeFolderId);
+  if (!activeNoteId || !visibleNotes.some(n => n.id === activeNoteId)) {
+    activeNoteId = visibleNotes.length ? visibleNotes[0].id : null;
+  }
+  document.querySelector(".notes-list-pane").outerHTML = notesListPaneHtml(visibleNotes);
+  document.querySelector(".notes-editor-pane").outerHTML = notesEditorPaneHtml();
+  attachNotesListEvents();
+  attachNotesEditorEvents();
+}
+
+/* ==========================================================
+   14. SETTINGS
    ========================================================== */
 function renderSettings() {
   document.getElementById("page-settings").innerHTML = `
@@ -1250,7 +1566,7 @@ function renderSettings() {
 }
 
 /* ==========================================================
-   14. SERVICE WORKER + ONESIGNAL
+   15. SERVICE WORKER + ONESIGNAL
    ========================================================== */
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
@@ -1266,7 +1582,7 @@ function registerServiceWorker() {
 }
 
 /* ==========================================================
-   15. BOOTSTRAP
+   16. BOOTSTRAP
    ========================================================== */
 function initApp() {
   ensureDayRecord(getTodayKey());
