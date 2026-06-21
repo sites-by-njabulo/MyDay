@@ -1725,7 +1725,9 @@ button, input { font-family: inherit; }
 .notes-pill-icon:disabled { color: var(--text-secondary); opacity: 0.6; cursor: default; }
 .notes-time-group-label {
   list-style: none;
-  margin: 18px 4px 8px;
+  /* Left/right match .notes-list-row's own 14px padding exactly, so the
+     label's text starts at the same x position as the note titles below it. */
+  margin: 18px 14px 8px;
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
@@ -1786,18 +1788,54 @@ button, input { font-family: inherit; }
 .notes-folder-delete:hover { color: var(--danger); }
 
 .notes-list-rows { list-style: none; margin: 0; padding: 0; }
+
+/* Mobile-only swipe-to-delete. .notes-swipe-item clips/positions the red
+   delete strip behind .notes-swipe-content, which needs an OPAQUE
+   background (matching the surrounding card) so it actually covers the
+   strip until swiped — desktop resets that background to none below,
+   since it never shows the strip at all (no touch input to reveal it). */
+.notes-swipe-item { position: relative; overflow: hidden; }
+.notes-swipe-delete-bg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 84px;
+  display: flex;
+}
+.notes-swipe-delete-btn {
+  flex: 1;
+  border: none;
+  background: var(--danger);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  /* Starts scaled-down/invisible; .swipe-open (added the moment a
+     horizontal drag is detected, not just once it settles) triggers the
+     spring-like overshoot below. */
+  transform: scale(0.5);
+  opacity: 0;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s var(--ease-out-quart);
+}
+.notes-swipe-item.swipe-open .notes-swipe-delete-btn {
+  transform: scale(1);
+  opacity: 1;
+}
+
 .notes-list-row {
   display: flex;
   flex-direction: column;
   gap: 4px;
   width: 100%;
+  position: relative;
+  background: var(--card-bg);
   border: none;
   border-bottom: 1px solid var(--border);
-  background: none;
   padding: 13px 14px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s var(--ease-out-quart);
+  transition: background 0.15s var(--ease-out-quart), transform 0.25s var(--ease-out-quart);
 }
 .notes-list-card ul.notes-list-rows li:last-child .notes-list-row { border-bottom: none; }
 .notes-list-row:hover { background: var(--surface-3); }
@@ -2070,8 +2108,10 @@ button, input { font-family: inherit; }
 
   .notes-list-pane .notes-pane-header { flex: none; padding: 20px 16px 14px; margin-bottom: 0; }
   .notes-list-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: 0 10px 20px; }
-  .notes-list-row { padding: 11px 8px; border-radius: var(--radius-sm); }
+  .notes-list-row { padding: 11px 8px; border-radius: var(--radius-sm); background: none; }
   .notes-list-card ul.notes-list-rows li:last-child .notes-list-row { border-bottom: 1px solid var(--border); }
+  /* Swipe-to-delete is mobile-only — no touch input on desktop to reveal it. */
+  .notes-swipe-delete-bg { display: none; }
 
   .notes-editor-pane .notes-pane-header { flex: none; padding: 16px 24px 0; margin-bottom: 0; }
   .notes-editor-pane .note-title-input { flex: none; margin: 16px 24px 10px; width: auto; }

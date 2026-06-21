@@ -1684,9 +1684,16 @@ function notesFoldersPaneHtml() {
 }
 
 function notesListRowHtml(n) {
+  // .notes-swipe-item/-delete-bg/-content: mobile-only swipe-to-delete
+  // structure (see attachNoteSwipeToDelete). Desktop hides the delete strip
+  // entirely via CSS and the touch handlers simply never fire without touch
+  // input, so .notes-list-row behaves exactly as it did before there.
   return `
-    <li>
-      <button class="notes-list-row ${activeNoteId === n.id ? "active" : ""}" data-id="${n.id}">
+    <li class="notes-swipe-item" data-swipe-id="${n.id}">
+      <div class="notes-swipe-delete-bg">
+        <button class="notes-swipe-delete-btn" data-delete-id="${n.id}" aria-label="Delete note">Delete</button>
+      </div>
+      <button class="notes-list-row notes-swipe-content ${activeNoteId === n.id ? "active" : ""}" data-id="${n.id}">
         <span class="notes-row-top"><span class="notes-row-title">${escapeHtml(n.title) || "New Note"}</span><span class="notes-row-date">${formatNoteDate(n.updatedAt)}</span></span>
         <span class="notes-row-preview">${escapeHtml(notePreview(n)) || "No additional text"}</span>
       </button>
@@ -1883,6 +1890,141 @@ function attachNotesFolderEvents() {
   });
 }
 
+// Per-row click listeners: re-attached every time the rows are (re)rendered,
+// safe because the buttons themselves are freshly created each time (either
+// by a full renderNotes() or rerenderNotesListRows()'s innerHTML swap) — the
+// old buttons and their listeners are discarded together, no accumulation.
+function attachNoteRowClickHandlers() {
+  document.querySelectorAll(".notes-list-row").forEach(btn => {
+    btn.addEventListener("click", function () {
+      activeNoteId = btn.dataset.id;
+      notesView = "editor";
+      renderNotes();
+    });
+  });
+}
+
+const SWIPE_DELETE_WIDTH = 84;
+let swipeTouch = null;
+let openSwipeRow = null;
+
+function closeOpenSwipeRow() {
+  if (!openSwipeRow) return;
+  const content = openSwipeRow.querySelector(".notes-swipe-content");
+  if (content) content.style.transform = "translateX(0)";
+  openSwipeRow.classList.remove("swipe-open");
+  openSwipeRow = null;
+}
+
+function performNoteSwipeDelete(item, noteId) {
+  // Collapse animation: lock the current height, then transition it (and
+  // the row's own opacity) down to 0 before actually removing the note.
+  const height = item.getBoundingClientRect().height;
+  item.style.height = height + "px";
+  item.style.overflow = "hidden";
+  item.style.transition = "height 0.25s var(--ease-out-quart), opacity 0.2s var(--ease-out-quart), margin 0.25s var(--ease-out-quart)";
+  requestAnimationFrame(() => {
+    item.style.height = "0px";
+    item.style.opacity = "0";
+    item.style.marginBottom = "0px";
+  });
+  if (openSwipeRow === item) openSwipeRow = null;
+  setTimeout(() => {
+    deleteNote(noteId);
+    if (currentSectionName === "notes") renderNotes();
+  }, 260);
+}
+
+// Delegated on the .notes-list-rows CONTAINER, attached exactly once per
+// full renderNotes() (never inside rerenderNotesListRows(), which only
+// swaps the container's children) — the container itself persists across
+// those partial updates, so re-attaching here would stack duplicate
+// handlers the same way the old To-Do checkbox bug did.
+function attachNoteSwipeToDelete(container) {
+  if (!container) return;
+
+  container.addEventListener("touchstart", function (e) {
+    const item = e.target.closest(".notes-swipe-item");
+    if (!item) return;
+    swipeTouch = {
+      item,
+      content: item.querySelector(".notes-swipe-content"),
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
+      currentX: e.touches[0].clientX,
+      locked: null, // null = undetermined yet, true = horizontal swipe, false = vertical scroll
+      baseOffset: item.classList.contains("swipe-open") ? -SWIPE_DELETE_WIDTH : 0
+    };
+  }, { passive: true });
+
+  container.addEventListener("touchmove", function (e) {
+    if (!swipeTouch) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - swipeTouch.startX;
+    const dy = touch.clientY - swipeTouch.startY;
+    if (swipeTouch.locked === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      swipeTouch.locked = Math.abs(dx) > Math.abs(dy);
+      if (swipeTouch.locked) {
+        if (openSwipeRow && openSwipeRow !== swipeTouch.item) closeOpenSwipeRow();
+        // Adding this class now (not just at touchend) is what makes the
+        // delete button spring-scale in DURING the swipe, not just snap
+        // into existence once the gesture finishes.
+        swipeTouch.item.classList.add("swipe-open");
+        swipeTouch.content.style.transition = "none"; // raw 1:1 finger tracking while dragging
+      }
+    }
+    if (swipeTouch.locked) {
+      e.preventDefault(); // stop vertical scroll while actively swiping horizontally
+      const offset = Math.min(0, Math.max(-SWIPE_DELETE_WIDTH - 24, swipeTouch.baseOffset + dx));
+      swipeTouch.content.style.transform = `translateX(${offset}px)`;
+      swipeTouch.currentX = touch.clientX;
+    }
+  }, { passive: false });
+
+  function endSwipe() {
+    if (!swipeTouch) return;
+    const { item, content, locked, startX, currentX, baseOffset } = swipeTouch;
+    if (locked) {
+      content.style.transition = ""; // restore the CSS transition for a smooth snap
+      const finalOffset = baseOffset + (currentX - startX);
+      if (finalOffset < -SWIPE_DELETE_WIDTH / 2) {
+        content.style.transform = `translateX(-${SWIPE_DELETE_WIDTH}px)`;
+        item.classList.add("swipe-open");
+        openSwipeRow = item;
+      } else {
+        content.style.transform = "translateX(0)";
+        item.classList.remove("swipe-open");
+        if (openSwipeRow === item) openSwipeRow = null;
+      }
+    }
+    swipeTouch = null;
+  }
+  container.addEventListener("touchend", endSwipe);
+  container.addEventListener("touchcancel", endSwipe);
+
+  // Capture phase, so this runs BEFORE the row's own (bubbling) click-to-
+  // navigate listener — lets a dismiss-tap stop that listener from also
+  // firing on the same tap, matching iOS (the first tap elsewhere only
+  // dismisses; it never also performs the tapped row's normal action).
+  container.addEventListener("click", function (e) {
+    const deleteBtn = e.target.closest(".notes-swipe-delete-btn");
+    if (deleteBtn) {
+      performNoteSwipeDelete(deleteBtn.closest(".notes-swipe-item"), deleteBtn.dataset.deleteId);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (openSwipeRow) {
+      const tappedItem = e.target.closest(".notes-swipe-item");
+      closeOpenSwipeRow();
+      if (tappedItem) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
+  }, true);
+}
+
 function attachNotesListEvents() {
   document.getElementById("notes-back-to-folders").addEventListener("click", function () {
     notesView = "folders";
@@ -1892,13 +2034,8 @@ function attachNotesListEvents() {
     notesView = "folders";
     renderNotes();
   });
-  document.querySelectorAll(".notes-list-row").forEach(btn => {
-    btn.addEventListener("click", function () {
-      activeNoteId = btn.dataset.id;
-      notesView = "editor";
-      renderNotes();
-    });
-  });
+  attachNoteRowClickHandlers();
+  attachNoteSwipeToDelete(document.querySelector(".notes-list-rows"));
 }
 
 function attachNotesEditorEvents() {
@@ -1942,14 +2079,11 @@ function rerenderNotesListRows() {
   const activeNoteChanged = !activeNoteId || !visibleNotes.some(n => n.id === activeNoteId);
   if (activeNoteChanged) activeNoteId = visibleNotes.length ? visibleNotes[0].id : null;
 
+  // Any swipe-open row is about to be destroyed by the innerHTML swap below
+  // — drop the stale reference rather than leave it pointing at a detached node.
+  openSwipeRow = null;
   document.querySelector(".notes-list-rows").innerHTML = notesListRowsHtml(visibleNotes);
-  document.querySelectorAll(".notes-list-row").forEach(btn => {
-    btn.addEventListener("click", function () {
-      activeNoteId = btn.dataset.id;
-      notesView = "editor";
-      renderNotes();
-    });
-  });
+  attachNoteRowClickHandlers();
   document.querySelectorAll(".notes-mobile-subtitle").forEach(el => {
     el.textContent = `${visibleNotes.length} Note${visibleNotes.length === 1 ? "" : "s"}`;
   });
