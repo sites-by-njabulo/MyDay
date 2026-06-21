@@ -1750,6 +1750,9 @@ button, input { font-family: inherit; }
      (also bottom:14px), and the nav's higher z-index would silently eat
      every tap meant for the search bar / compose button underneath it. */
   bottom: calc(90px + env(safe-area-inset-bottom));
+  /* Smoothly slides to sit just above the on-screen keyboard when it opens
+     (see repositionNotesMobileBar() in app.js) instead of jumping/flickering. */
+  transition: bottom 0.15s var(--ease-out-quart);
   z-index: 45;
   display: flex;
   align-items: center;

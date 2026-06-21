@@ -127,6 +127,30 @@ function saveState() {
   pushStateToSupabase();
 }
 
+// Postgres returns timestamptz as e.g. "...798+00:00" while JS's
+// toISOString() sends "...798Z" — date-equal but string-different, so
+// comparing updated_at values with === to detect "this is just the echo of
+// my own write" always failed, meaning every save (including ones mid-
+// keystroke) was treated as a change FROM ANOTHER DEVICE and triggered a
+// full re-render — destroying and recreating the contenteditable note body
+// and stealing focus while typing. Parsing both into a Date first compares
+// the actual instant instead of the string formatting.
+function sameTimestamp(a, b) {
+  if (!a || !b) return false;
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+// Defense in depth on top of sameTimestamp() above: even a genuine change
+// from another device should never yank focus out from under whatever text
+// field the user is actively typing in on THIS device. The data still gets
+// applied (so nothing from the other device is lost) — only the visual
+// re-render is deferred until the user isn't mid-keystroke.
+function isTypingInTextField() {
+  const el = document.activeElement;
+  if (!el) return false;
+  return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
+}
+
 let stateUpdatedAt = null; // updated_at of the row we last read/wrote, used to ignore our own echoed realtime events
 let statePushTimer = null;
 
@@ -137,14 +161,18 @@ function pushStateToSupabase() {
   // keystroke. Coalescing rapid saves into one request avoids hammering the
   // network and keeps cross-device updates feeling instant without spamming.
   statePushTimer = setTimeout(async () => {
+    // Set before the request, not after it resolves: the realtime echo of
+    // this exact write can arrive over the websocket before this await
+    // returns, and subscribeToStateChanges() needs stateUpdatedAt to
+    // already reflect it at that moment to recognize the echo as our own.
+    const nowIso = new Date().toISOString();
+    stateUpdatedAt = nowIso;
     try {
-      const nowIso = new Date().toISOString();
       const { error } = await sb
         .from("myday_state")
         .update({ data: state, updated_at: nowIso })
         .eq("id", "singleton");
       if (error) throw error;
-      stateUpdatedAt = nowIso;
     } catch (e) {
       console.warn("Supabase save failed; change is still safe in localStorage.", e);
     }
@@ -177,11 +205,11 @@ function subscribeToStateChanges() {
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "myday_state" }, payload => {
       // Skip the echo of our own write — payload.new.updated_at will match
       // what pushStateToSupabase()/syncStateFromSupabase() just recorded.
-      if (payload.new.updated_at === stateUpdatedAt) return;
+      if (sameTimestamp(payload.new.updated_at, stateUpdatedAt)) return;
       state = migrateState(Object.assign(defaultState(), payload.new.data));
       stateUpdatedAt = payload.new.updated_at;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      renderSection(currentSectionName);
+      if (!isTypingInTextField()) renderSection(currentSectionName);
     })
     .subscribe();
 }
@@ -1383,14 +1411,16 @@ function pushNotesToSupabase() {
   if (!sb) return;
   clearTimeout(notesPushTimer);
   notesPushTimer = setTimeout(async () => {
+    // Set before the request, not after — see the matching comment in
+    // pushStateToSupabase() above for why.
+    const nowIso = new Date().toISOString();
+    notesUpdatedAt = nowIso;
     try {
-      const nowIso = new Date().toISOString();
       const { error } = await sb
         .from("myday_notes")
         .update({ data: notesData, updated_at: nowIso })
         .eq("id", "singleton");
       if (error) throw error;
-      notesUpdatedAt = nowIso;
     } catch (e) {
       console.warn("Supabase notes save failed; change is still safe in localStorage.", e);
     }
@@ -1418,11 +1448,11 @@ function subscribeToNotesChanges() {
   if (!sb) return;
   sb.channel("myday_notes_changes")
     .on("postgres_changes", { event: "UPDATE", schema: "public", table: "myday_notes" }, payload => {
-      if (payload.new.updated_at === notesUpdatedAt) return;
+      if (sameTimestamp(payload.new.updated_at, notesUpdatedAt)) return;
       notesData = Object.assign(defaultNotesData(), payload.new.data);
       notesUpdatedAt = payload.new.updated_at;
       localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesData));
-      if (currentSectionName === "notes") renderNotes();
+      if (currentSectionName === "notes" && !isTypingInTextField()) renderNotes();
     })
     .subscribe();
 }
@@ -1532,9 +1562,30 @@ function renderNotes() {
 // box instead of the viewport. That's why this can't just be a fixed div
 // nested in one of the panes (it was, and silently floated at the top of
 // the page's content instead of pinning to the screen's bottom edge).
+// On mobile, the on-screen keyboard shrinks window.visualViewport without
+// shrinking the layout viewport that position:fixed anchors to — so a
+// fixed-bottom element just sits where it always does, now covered by the
+// keyboard, unless something actively moves it. Comparing the two viewport
+// heights gives the keyboard's height, which we use to lift the bar to sit
+// just above it; when the keyboard closes, the gap collapses back to ~0 and
+// the bar returns to its normal CSS position (above the nav pill).
+function repositionNotesMobileBar() {
+  const bar = document.getElementById("notes-mobile-bar");
+  if (!bar || !window.visualViewport) return;
+  const keyboardHeight = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+  bar.style.bottom = keyboardHeight > 80 ? `${keyboardHeight + 10}px` : "";
+}
+
+function setupNotesMobileBarKeyboardHandling() {
+  if (!window.visualViewport) return;
+  window.visualViewport.addEventListener("resize", repositionNotesMobileBar);
+  window.visualViewport.addEventListener("scroll", repositionNotesMobileBar);
+}
+
 function renderNotesMobileBar() {
   const bar = document.getElementById("notes-mobile-bar");
   bar.classList.remove("hidden");
+  repositionNotesMobileBar();
   if (notesView === "editor") {
     const note = activeNoteId ? notesData.notes.find(n => n.id === activeNoteId) : null;
     bar.innerHTML = `
@@ -2005,6 +2056,7 @@ function initApp() {
   armMidnightWatcher();
   subscribeToStateChanges();
   subscribeToNotesChanges();
+  setupNotesMobileBarKeyboardHandling();
 }
 
 function runSplash() {
