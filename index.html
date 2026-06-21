@@ -114,6 +114,12 @@
 
 <script src="data/verses.js"></script>
 <script src="data/quotes.js"></script>
+<!--
+  Supabase client — used for cross-device real-time sync (see CLAUDE.md).
+  If this fails to load (offline, CDN blocked, etc.) app.js detects that
+  window.supabase is missing and falls back to localStorage-only mode.
+-->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

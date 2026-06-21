@@ -12,6 +12,21 @@ const APP_PASSWORD = "02233";
 const STORAGE_KEY = "myday_state";
 const SESSION_UNLOCK_KEY = "myday_unlocked";
 
+// Cross-device real-time sync (see CLAUDE.md for the full architecture and
+// the required one-time Supabase SQL setup in supabase/schema.sql).
+// No Supabase Auth is used — this is a single-person app with a casual
+// client-side password (APP_PASSWORD above), not a real auth system, so the
+// anon key below gets full read/write access via RLS. Same caveat as that
+// password: a casual deterrent, not real security.
+const SUPABASE_URL = "https://cqblgvscgcrfabvuxsml.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_lskR1oUUEEQJyf8_rivQtA_7wO8lot9";
+// window.supabase is missing if the CDN script failed to load (offline,
+// blocked, etc.) — every Supabase call in this file checks `sb` first and
+// falls back to localStorage-only behavior when it's null.
+const sb = (typeof window !== "undefined" && window.supabase)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
 const DEFAULT_GOALS = { pushups: 200, curls: 100 };
 const CHALLENGE_TARGET = 10000;
 const CHALLENGE_DURATION_DAYS = 60;
@@ -84,7 +99,7 @@ function migrateState(s) {
   return s;
 }
 
-function loadState() {
+function loadStateFromLocalStorage() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultState();
@@ -96,10 +111,79 @@ function loadState() {
   }
 }
 
-let state = loadState();
+// Offline-first: the localStorage copy is the immediately-available value
+// every render/click-handler in this file already relies on synchronously.
+// The Supabase fetch below starts right away in the background (in parallel
+// with the splash screen and the rest of this script), and runSplash()
+// (region 16) awaits it before the first real render — replacing `state`
+// with the freshest cross-device copy when it succeeds. The realtime
+// subscription keeps it updated after that. The app stays fully usable on
+// the localStorage copy alone if any of this fails or never loads.
+let state = loadStateFromLocalStorage();
+const stateSupabaseSyncPromise = syncStateFromSupabase();
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  pushStateToSupabase();
+}
+
+let stateUpdatedAt = null; // updated_at of the row we last read/wrote, used to ignore our own echoed realtime events
+let statePushTimer = null;
+
+function pushStateToSupabase() {
+  if (!sb) return;
+  clearTimeout(statePushTimer);
+  // Debounced: typing in a description/title can call saveState() on every
+  // keystroke. Coalescing rapid saves into one request avoids hammering the
+  // network and keeps cross-device updates feeling instant without spamming.
+  statePushTimer = setTimeout(async () => {
+    try {
+      const nowIso = new Date().toISOString();
+      const { error } = await sb
+        .from("myday_state")
+        .update({ data: state, updated_at: nowIso })
+        .eq("id", "singleton");
+      if (error) throw error;
+      stateUpdatedAt = nowIso;
+    } catch (e) {
+      console.warn("Supabase save failed; change is still safe in localStorage.", e);
+    }
+  }, 400);
+}
+
+async function syncStateFromSupabase() {
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from("myday_state").select("data, updated_at").eq("id", "singleton").single();
+    if (error) throw error;
+    if (data && data.data && Object.keys(data.data).length > 0) {
+      state = migrateState(Object.assign(defaultState(), data.data));
+      stateUpdatedAt = data.updated_at;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } else {
+      // First-ever run: the singleton row exists but is still the empty
+      // default seeded by schema.sql. Push our local copy up so every other
+      // device has something to sync from.
+      pushStateToSupabase();
+    }
+  } catch (e) {
+    console.warn("Supabase initial state load failed; using localStorage copy.", e);
+  }
+}
+
+function subscribeToStateChanges() {
+  if (!sb) return;
+  sb.channel("myday_state_changes")
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "myday_state" }, payload => {
+      // Skip the echo of our own write — payload.new.updated_at will match
+      // what pushStateToSupabase()/syncStateFromSupabase() just recorded.
+      if (payload.new.updated_at === stateUpdatedAt) return;
+      state = migrateState(Object.assign(defaultState(), payload.new.data));
+      stateUpdatedAt = payload.new.updated_at;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      renderSection(currentSectionName);
+    })
+    .subscribe();
 }
 
 // Applied immediately on load (so the splash/lock screens also respect a saved
@@ -1270,7 +1354,7 @@ function defaultNotesData() {
   return { schemaVersion: 1, folders: [], notes: [] };
 }
 
-function loadNotesData() {
+function loadNotesDataFromLocalStorage() {
   try {
     const raw = localStorage.getItem(NOTES_STORAGE_KEY);
     if (!raw) return defaultNotesData();
@@ -1281,10 +1365,66 @@ function loadNotesData() {
   }
 }
 
-let notesData = loadNotesData();
+// Same offline-first pattern as state above: synchronous localStorage value
+// first, the Supabase fetch starts immediately in the background, and
+// runSplash() awaits it before the first real render.
+let notesData = loadNotesDataFromLocalStorage();
+const notesSupabaseSyncPromise = syncNotesFromSupabase();
 
 function saveNotesData() {
   localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesData));
+  pushNotesToSupabase();
+}
+
+let notesUpdatedAt = null;
+let notesPushTimer = null;
+
+function pushNotesToSupabase() {
+  if (!sb) return;
+  clearTimeout(notesPushTimer);
+  notesPushTimer = setTimeout(async () => {
+    try {
+      const nowIso = new Date().toISOString();
+      const { error } = await sb
+        .from("myday_notes")
+        .update({ data: notesData, updated_at: nowIso })
+        .eq("id", "singleton");
+      if (error) throw error;
+      notesUpdatedAt = nowIso;
+    } catch (e) {
+      console.warn("Supabase notes save failed; change is still safe in localStorage.", e);
+    }
+  }, 400);
+}
+
+async function syncNotesFromSupabase() {
+  if (!sb) return;
+  try {
+    const { data, error } = await sb.from("myday_notes").select("data, updated_at").eq("id", "singleton").single();
+    if (error) throw error;
+    if (data && data.data && Object.keys(data.data).length > 0) {
+      notesData = Object.assign(defaultNotesData(), data.data);
+      notesUpdatedAt = data.updated_at;
+      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesData));
+    } else {
+      pushNotesToSupabase();
+    }
+  } catch (e) {
+    console.warn("Supabase initial notes load failed; using localStorage copy.", e);
+  }
+}
+
+function subscribeToNotesChanges() {
+  if (!sb) return;
+  sb.channel("myday_notes_changes")
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "myday_notes" }, payload => {
+      if (payload.new.updated_at === notesUpdatedAt) return;
+      notesData = Object.assign(defaultNotesData(), payload.new.data);
+      notesUpdatedAt = payload.new.updated_at;
+      localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notesData));
+      if (currentSectionName === "notes") renderNotes();
+    })
+    .subscribe();
 }
 
 let notesView = "folders"; // mobile drill-down only: "folders" | "list" | "editor"
@@ -1863,13 +2003,25 @@ function initApp() {
   showSection("home");
   registerServiceWorker();
   armMidnightWatcher();
+  subscribeToStateChanges();
+  subscribeToNotesChanges();
 }
 
 function runSplash() {
   setTimeout(() => {
     splashView.classList.add("fade-out");
-    setTimeout(() => {
+    setTimeout(async () => {
       splashView.classList.add("hidden");
+      // Give the Supabase fetches (already in flight since the moment this
+      // script started) a chance to land before the first real render, so
+      // the app opens with the freshest cross-device data when possible —
+      // but never block startup for more than 3s if the network is slow or
+      // unreachable; the localStorage copy is already a perfectly usable
+      // fallback (see the comments on stateSupabaseSyncPromise above).
+      await Promise.race([
+        Promise.all([stateSupabaseSyncPromise, notesSupabaseSyncPromise]),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
       // LOCK_ENABLED is off, so the password gate is skipped entirely and we
       // go straight to the app. Flip LOCK_ENABLED back to true to restore it
       // without losing any of the lock-screen code below.
