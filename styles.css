@@ -515,17 +515,24 @@ button, input { font-family: inherit; }
      sidebar is collapsed) so .page's own max-width+auto-margins below center
      within the true available space instead of an artificially-capped box. */
   #main-content { margin-left: var(--nav-w); padding: 36px 40px 60px; max-width: none; }
-  /* Centers each page's own content instead of constraining #main-content
-     itself, so #main-content can stay full-width (spanning all the way to
-     the right edge, and all the way to the left edge once the sidebar is
-     collapsed) while the readable column inside it centers within whatever
-     space is actually available — narrower next to an open sidebar, wider
-     once it's collapsed, Notion/Claude-style either way. #page-notes is
-     excluded: its 3-pane layout intentionally fills the full width. */
+  /* Caps each page's own content width instead of constraining #main-content
+     itself, so #main-content can stay full-width while the column inside it
+     is free to center independently. #page-notes is excluded: its 3-pane
+     layout intentionally fills the full width.
+     Left-aligned (margin-left:0) by default, matching the original layout
+     while the sidebar is open — centering both columns at once (sidebar +
+     centered content) read as visually busy/hard to focus on. Centering
+     only kicks in once the sidebar is collapsed (override just below), when
+     there's no second column competing for attention and a full-width flush
+     -left block would otherwise look unbalanced. */
   .page:not(#page-notes) {
     max-width: 760px;
-    margin-left: auto;
+    margin-left: 0;
     margin-right: auto;
+    transition: margin-left 0.25s var(--ease-out-quart), margin-right 0.25s var(--ease-out-quart);
+  }
+  .app-shell.sidebar-collapsed .page:not(#page-notes) {
+    margin-left: auto;
   }
   /* Reserve exactly the panel's width (280px) + gap (16px) as EXTRA room, so
      opening the day-detail panel never shrinks the calendar's own grown
