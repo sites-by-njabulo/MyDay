@@ -1681,6 +1681,11 @@ button, input { font-family: inherit; }
 .notes-search svg { width: 15px; height: 15px; color: var(--text-secondary); flex: none; }
 .notes-search input {
   flex: 1;
+  /* Flex items default to min-width:auto, which for a text input is its
+     browser-default intrinsic content width (~170-190px) — large enough to
+     overflow this 195px-wide bar regardless of flex:1, since flex:1 only
+     governs growing/shrinking ABOVE that floor, not below it. */
+  min-width: 0;
   border: none;
   background: none;
   outline: none;
@@ -2093,7 +2098,14 @@ button, input { font-family: inherit; }
     display: flex;
     flex-direction: column;
   }
-  .notes-all-notes-row { flex: none; margin: 0 10px 8px; border-bottom: none; }
+  /* width:auto overrides the inherited width:100% from .notes-folder-row —
+     with that left in place, the 10px side margins were added OUTSIDE the
+     already-100%-wide box instead of being subtracted from it, overflowing
+     the row 10px past the folders column's own right edge and clipping the
+     note count against it. flex stretch (the default for a column flex
+     item) fills the available width correctly accounting for margins once
+     width is auto instead of an explicit 100%. */
+  .notes-all-notes-row { flex: none; width: auto; margin: 0 10px 8px; border-bottom: none; }
   .notes-folder-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: 0 10px 20px; }
   .notes-folder-item { border-bottom: none; }
   .notes-folder-row { padding: 9px 8px; border-radius: var(--radius-sm); }

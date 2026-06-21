@@ -2120,7 +2120,7 @@ function renderSettings() {
         <input type="time" id="workout-time" value="${state.settings.workoutReminderTime}" />
       </div>
     </div>
-    <p class="settings-note">${ICONS.warning}<span>Prayer now reminds you 3x a day (1PM, 5PM, 8PM) — those times
+    <p class="settings-note">${ICONS.warning}<span>Prayer now reminds you 3x a day (12PM, 5PM, 8PM) — those times
     are fixed in <code>.github/workflows/reminders.yml</code>, not editable here. Changing the workout time above
     updates MyDay only; you must also edit the matching cron line in that file (and push the change) for the real
     reminder to move. See CLAUDE.md for the full notification setup guide.</span></p>
