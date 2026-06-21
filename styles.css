@@ -1519,10 +1519,24 @@ button, input { font-family: inherit; }
 /* ===== Notes ===== */
 .notes-layout { display: flex; gap: 16px; align-items: flex-start; }
 
+/* #main-content normally contributes its own 24px side padding (set near
+   the top of this file) on top of whatever the pane below adds, which is
+   what made the content noticeably narrower than the fixed bottom bar
+   (#notes-mobile-bar, an outside-the-page sibling with its own independent
+   inset). Zeroing it here — unconditionally, not just in the desktop media
+   query below — makes the pane's own padding the single source of truth
+   for the horizontal inset on every breakpoint, so it's trivial to keep
+   text content and the bottom bar pixel-aligned: just reuse the same
+   number in both places (see #notes-mobile-bar further down). */
+#main-content:has(#page-notes.active .notes-layout) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .notes-folders-pane, .notes-list-pane, .notes-editor-pane {
   position: relative;
   width: 100%;
-  padding: 20px 16px 0;
+  padding: 20px 28px 0;
 }
 /* Mobile: full-screen drill-down — only the active level shows. */
 .notes-layout[data-mobile-view="folders"] .notes-list-pane,
@@ -1711,8 +1725,12 @@ button, input { font-family: inherit; }
    the page's content instead of pinning it to the bottom of the screen.) */
 #notes-mobile-bar {
   position: fixed;
-  left: 14px;
-  right: 14px;
+  /* Matches .notes-folders-pane/.notes-list-pane/.notes-editor-pane's own
+     28px side padding exactly, so the search bar/compose button line up
+     with the title and card above instead of stretching to the nav's
+     wider 14px inset. */
+  left: 28px;
+  right: 28px;
   /* Sits above the floating bottom-nav pill, matching .todo-fab's own
      bottom offset — bottom:14px alone would sit exactly UNDER the nav
      (also bottom:14px), and the nav's higher z-index would silently eat
