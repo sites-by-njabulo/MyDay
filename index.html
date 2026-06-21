@@ -57,7 +57,12 @@
   <div class="app-shell">
 
     <nav id="main-nav">
-      <div class="nav-brand"><img src="icons/logo-mark.png" alt="" class="nav-brand-mark"><span class="nav-brand-text">MyDay</span></div>
+      <div class="nav-brand">
+        <img src="icons/logo-mark.png" alt="" class="nav-brand-mark"><span class="nav-brand-text">MyDay</span>
+        <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" aria-label="Collapse sidebar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+      </div>
       <button class="nav-item active" data-section="home">
         <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-12h6v12"/></svg></span>
         <span class="nav-label">Home</span>
@@ -109,6 +114,9 @@
   </button>
   <div id="notes-mobile-bar" class="hidden"></div>
   <div id="todo-sheet-root"></div>
+  <button class="sidebar-reopen-btn" id="sidebar-reopen-btn" aria-label="Open sidebar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+  </button>
 
 </div>
 

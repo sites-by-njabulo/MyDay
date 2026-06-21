@@ -415,6 +415,18 @@ button, input { font-family: inherit; }
   transform: scale(1);
 }
 
+/* Desktop-only sidebar collapse/reopen. Hidden entirely on mobile, where the
+   bottom nav pill is untouched by this feature. Lives outside .app-shell
+   (same as .todo-fab etc.) rather than inside #main-nav, since a
+   position:fixed element only needs to dodge an ANIMATED ancestor's
+   containing block, and #main-nav's own entrance animation (navRevealLeft)
+   would otherwise anchor it to the sidebar's box instead of the viewport.
+   This base rule must appear BEFORE the desktop media query below — same
+   specificity as that block's display:flex override, so whichever is later
+   in the file wins regardless of the media query, the exact bug already
+   fixed once before in this file for .todo-add-inline/.notes-search. */
+.sidebar-reopen-btn { display: none; }
+
 /* ===== Desktop: sidebar nav ===== */
 @media (min-width: 769px) {
   #main-nav {
@@ -430,6 +442,8 @@ button, input { font-family: inherit; }
     align-items: stretch;
     justify-content: flex-start;
     border-top: none;
+    border-left: none;
+    border-bottom: none;
     border-right: 1px solid var(--border);
     padding: 20px 12px;
     gap: 2px;
@@ -443,6 +457,23 @@ button, input { font-family: inherit; }
     gap: 10px;
     padding: 4px 10px 22px;
   }
+  .sidebar-toggle-btn {
+    margin-left: auto;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart);
+  }
+  .sidebar-toggle-btn:hover { background: var(--surface-3); color: var(--text-primary); }
+  .sidebar-toggle-btn svg { width: 16px; height: 16px; }
   .nav-brand-mark {
     width: 24px;
     height: 24px;
@@ -487,6 +518,58 @@ button, input { font-family: inherit; }
      permanently widening #main-content on every other page for the rest of the
      session. Same bug class fixed below for .notes-layout. */
   #main-content:has(#page-todo.active .cal-panel) { max-width: calc(760px + 280px + 16px); }
+
+  /* Collapsible sidebar. Width+padding (not transform/visibility) so the
+     transition genuinely shrinks the box — overflow:hidden on #main-nav
+     clips its content as it shrinks instead of wrapping/reflowing it. */
+  #main-nav {
+    overflow: hidden;
+    transition: width 0.25s var(--ease-out-quart), padding 0.25s var(--ease-out-quart), border-right-width 0.25s var(--ease-out-quart);
+  }
+  #main-content { transition: margin-left 0.25s var(--ease-out-quart); }
+  .app-shell.sidebar-collapsed #main-nav {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-width: 0;
+  }
+  .app-shell.sidebar-collapsed #main-content { margin-left: 0; }
+
+  .sidebar-reopen-btn {
+    display: flex;
+    position: fixed;
+    top: 20px;
+    /* #main-content keeps its own 40px left padding when the sidebar is
+       collapsed (margin-left just goes to 0, padding is untouched) — sized
+       and positioned to sit fully inside that gutter so it never overlaps
+       page content (e.g. the Home page's Today/Challenge tab label). */
+    left: 8px;
+    z-index: 60;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-primary);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    /* Faded out (and unclickable) by default — only the collapsed state
+       below fades it in, kept smooth/consistent with the rest of this
+       feature rather than popping in with display:none/block. */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s var(--ease-out-quart);
+  }
+  .sidebar-reopen-btn svg { width: 14px; height: 14px; }
+  .sidebar-reopen-btn:hover { border-color: var(--hairline-strong); }
+  /* General sibling combinator — .sidebar-reopen-btn sits several siblings
+     after .app-shell inside #app-view (after the FAB/voice/notes-bar/sheet-
+     root elements), not immediately adjacent to it. */
+  .app-shell.sidebar-collapsed ~ .sidebar-reopen-btn {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 @keyframes modalFadeScaleIn {

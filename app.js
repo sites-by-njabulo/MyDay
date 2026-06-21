@@ -221,6 +221,26 @@ function applyTheme() {
 }
 applyTheme();
 
+// Desktop-only sidebar collapse — a per-device UI preference, not app data,
+// so it lives in its own localStorage key rather than inside state/Supabase
+// (collapsing it on a laptop shouldn't force it collapsed on a phone too,
+// and the mobile bottom nav doesn't have an equivalent concept at all).
+const SIDEBAR_COLLAPSED_KEY = "myday_sidebar_collapsed";
+
+function setSidebarCollapsed(collapsed) {
+  document.querySelector(".app-shell").classList.toggle("sidebar-collapsed", collapsed);
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+}
+
+// Applied immediately on load, before the splash/app even become visible,
+// so a previously-collapsed sidebar never flashes open first.
+function applySidebarCollapsedState() {
+  if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1") {
+    document.querySelector(".app-shell").classList.add("sidebar-collapsed");
+  }
+}
+applySidebarCollapsedState();
+
 function formatDateKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -2051,6 +2071,8 @@ function initApp() {
   document.querySelectorAll(".nav-avatar").forEach(el => el.textContent = USER_NAME.charAt(0));
   document.getElementById("todo-fab").addEventListener("click", () => openTodoSheet());
   document.getElementById("voice-fab").addEventListener("click", startVoiceCapture);
+  document.getElementById("sidebar-toggle-btn").addEventListener("click", () => setSidebarCollapsed(true));
+  document.getElementById("sidebar-reopen-btn").addEventListener("click", () => setSidebarCollapsed(false));
   showSection("home");
   registerServiceWorker();
   armMidnightWatcher();
