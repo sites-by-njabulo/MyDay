@@ -200,61 +200,69 @@ button, input { font-family: inherit; }
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-#lock-form {
+/* ----- PIN pad (iPhone-style: 4 dots, then a tap-only numeric keypad) ----- */
+.pin-dots {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-#lock-input {
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  font-size: 15px;
-  outline: none;
-  background: var(--input-bg);
-  color: var(--text-primary);
-  transition: border-color 0.2s var(--ease-out-quart);
+  justify-content: center;
+  gap: 18px;
+  margin: 0 0 32px;
   animation: lockFadeUp 0.5s var(--ease-out-expo) both;
   animation-delay: 0.22s;
 }
-#lock-input:focus {
-  border-color: var(--accent);
+.pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-secondary);
+  background: none;
+  transition: background 0.15s var(--ease-out-quart), border-color 0.15s var(--ease-out-quart), transform 0.15s var(--ease-out-quart);
 }
-#lock-input.error {
-  border-color: var(--danger);
-  animation: inputShake 0.4s var(--ease-out-quart);
+.pin-dot.filled {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  transform: scale(1.1);
 }
-#lock-form button {
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-primary);
-  background: var(--accent);
-  cursor: pointer;
-  transition: background 0.2s var(--ease-out-quart), transform 0.15s var(--ease-out-quart);
+.pin-dots.pin-shake { animation: pinShake 0.4s var(--ease-out-quart); }
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  justify-content: center;
+  justify-items: center;
+  align-items: center;
+  gap: 18px;
+  max-width: 280px;
+  margin: 0 auto;
   animation: lockFadeUp 0.5s var(--ease-out-expo) both;
   animation-delay: 0.28s;
 }
-#lock-form button:hover { background: var(--accent-hover); transform: scale(1.015); }
-#lock-form button:active { transform: scale(0.97); }
-.lock-error {
-  margin: 14px 0 0;
-  font-size: 13px;
-  color: var(--danger);
+.pin-key {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 26px;
   font-weight: 600;
-  opacity: 0;
-  transition: opacity 0.2s var(--ease-out-quart);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s var(--ease-out-quart), transform 0.1s var(--ease-out-quart);
 }
-.lock-error.show { opacity: 1; }
-@keyframes inputShake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-7px); }
-  40% { transform: translateX(7px); }
-  60% { transform: translateX(-5px); }
-  80% { transform: translateX(5px); }
-}
+.pin-key:active { background: var(--surface-3); transform: scale(0.94); }
+.pin-key-empty { background: none; border: none; cursor: default; pointer-events: none; }
+.pin-key-delete { background: none; border: none; }
+.pin-key-delete:active { background: none; }
+.pin-key-delete svg { width: 26px; height: 26px; }
 
 /* ===== App shell ===== */
 .app-shell {

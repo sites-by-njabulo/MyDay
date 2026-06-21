@@ -1,13 +1,14 @@
 /* ==========================================================
    1. CONFIG
    ========================================================== */
-// Set to true to bring the password gate back. While false, the splash
-// screen leads straight into the app and the lock screen never shows.
-const LOCK_ENABLED = false;
+// Set to false to skip the PIN gate entirely — the splash screen would
+// lead straight into the app and the lock screen would never show.
+const LOCK_ENABLED = true;
 
-// CHANGE THIS to your real password before you start using the app for real.
+// CHANGE PIN HERE
 // This is a casual deterrent only, not real security (visible in page source).
-const APP_PASSWORD = "02233";
+const APP_PIN = "0000";
+const PIN_LENGTH = APP_PIN.length;
 
 const STORAGE_KEY = "myday_state";
 const SESSION_UNLOCK_KEY = "myday_unlocked";
@@ -15,9 +16,9 @@ const SESSION_UNLOCK_KEY = "myday_unlocked";
 // Cross-device real-time sync (see CLAUDE.md for the full architecture and
 // the required one-time Supabase SQL setup in supabase/schema.sql).
 // No Supabase Auth is used — this is a single-person app with a casual
-// client-side password (APP_PASSWORD above), not a real auth system, so the
-// anon key below gets full read/write access via RLS. Same caveat as that
-// password: a casual deterrent, not real security.
+// client-side PIN (APP_PIN above), not a real auth system, so the anon key
+// below gets full read/write access via RLS. Same caveat as that PIN: a
+// casual deterrent, not real security.
 const SUPABASE_URL = "https://cqblgvscgcrfabvuxsml.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_lskR1oUUEEQJyf8_rivQtA_7wO8lot9";
 // window.supabase is missing if the CDN script failed to load (offline,
@@ -338,46 +339,86 @@ function animateRings(container, { instant = false } = {}) {
 const splashView = document.getElementById("splash-view");
 const lockView = document.getElementById("lock-view");
 const appView = document.getElementById("app-view");
-const lockForm = document.getElementById("lock-form");
-const lockInput = document.getElementById("lock-input");
-const lockError = document.getElementById("lock-error");
 const lockCard = document.querySelector(".lock-card");
+const pinDotsEl = document.getElementById("pin-dots");
+const pinDotEls = pinDotsEl.querySelectorAll(".pin-dot");
+const pinKeypad = document.getElementById("pin-keypad");
 
 function isUnlocked() {
   return sessionStorage.getItem(SESSION_UNLOCK_KEY) === "true";
 }
+
+// Tap-only numeric PIN entry — no text input/keyboard involved at all.
+let enteredPin = "";
+let pinValidating = false; // ignores taps while a wrong-PIN shake or a correct-PIN unlock is mid-animation
+
+function updatePinDots() {
+  pinDotEls.forEach((dot, i) => dot.classList.toggle("filled", i < enteredPin.length));
+}
+
+function rejectPin() {
+  pinValidating = true;
+  pinDotsEl.classList.remove("pin-shake");
+  requestAnimationFrame(() => pinDotsEl.classList.add("pin-shake"));
+  setTimeout(() => {
+    pinDotsEl.classList.remove("pin-shake");
+    enteredPin = "";
+    updatePinDots();
+    pinValidating = false;
+  }, 400); // matches the shake animation's duration
+}
+
+function handlePinDigit(digit) {
+  if (pinValidating || enteredPin.length >= PIN_LENGTH) return;
+  enteredPin += digit;
+  updatePinDots();
+  if (enteredPin.length === PIN_LENGTH) {
+    pinValidating = true;
+    // Brief pause so the 4th dot is visibly filled before judging it right/wrong — matches iPhone.
+    setTimeout(() => {
+      if (enteredPin === APP_PIN) {
+        unlockApp();
+      } else {
+        pinValidating = false;
+        rejectPin();
+      }
+    }, 150);
+  }
+}
+
+function handlePinDelete() {
+  if (pinValidating || !enteredPin.length) return;
+  enteredPin = enteredPin.slice(0, -1);
+  updatePinDots();
+}
+
+pinKeypad.addEventListener("click", function (e) {
+  const deleteBtn = e.target.closest("#pin-delete");
+  if (deleteBtn) {
+    handlePinDelete();
+    return;
+  }
+  const key = e.target.closest(".pin-key[data-key]");
+  if (key) handlePinDigit(key.dataset.key);
+});
 
 function unlockApp() {
   sessionStorage.setItem(SESSION_UNLOCK_KEY, "true");
   // Let the success pulse play before cutting to the app, instead of an instant swap.
   lockCard.classList.add("unlock-success");
   setTimeout(() => {
-    lockView.classList.add("hidden");
-    appView.classList.remove("hidden");
-    initApp();
+    enterApp();
   }, 380); // matches .unlock-success animation duration
 }
 
 function showLock() {
   lockCard.classList.remove("unlock-success");
+  enteredPin = "";
+  pinValidating = false;
+  updatePinDots();
   lockView.classList.remove("hidden");
   appView.classList.add("hidden");
 }
-
-lockForm.addEventListener("submit", function (e) {
-  e.preventDefault();
-  if (lockInput.value === APP_PASSWORD) {
-    lockError.classList.remove("show");
-    unlockApp();
-  } else {
-    lockError.classList.add("show");
-    lockInput.classList.remove("error");
-    requestAnimationFrame(() => lockInput.classList.add("error"));
-    setTimeout(() => lockInput.classList.remove("error"), 400);
-    lockInput.value = "";
-    lockInput.focus();
-  }
-});
 
 /* ==========================================================
    4. NAV ROUTER
@@ -2298,28 +2339,34 @@ function initApp() {
   setupNotesMobileBarKeyboardHandling();
 }
 
+// Give the Supabase fetches (already in flight since the moment this script
+// started, see stateSupabaseSyncPromise/notesSupabaseSyncPromise above) a
+// chance to land before the first real render, so the app opens with the
+// freshest cross-device data when possible — but never block for more than
+// 3s if the network is slow or unreachable; the localStorage copy is already
+// a perfectly usable fallback. Called once the PIN gate is cleared (or
+// immediately after the splash if LOCK_ENABLED is off) rather than from
+// runSplash() itself, so a slow network never delays the PIN screen from
+// appearing — only entering the app waits on this, never seeing the lock.
+async function enterApp() {
+  await Promise.race([
+    Promise.all([stateSupabaseSyncPromise, notesSupabaseSyncPromise]),
+    new Promise(resolve => setTimeout(resolve, 3000))
+  ]);
+  lockView.classList.add("hidden");
+  appView.classList.remove("hidden");
+  initApp();
+}
+
 function runSplash() {
   setTimeout(() => {
     splashView.classList.add("fade-out");
-    setTimeout(async () => {
+    setTimeout(() => {
       splashView.classList.add("hidden");
-      // Give the Supabase fetches (already in flight since the moment this
-      // script started) a chance to land before the first real render, so
-      // the app opens with the freshest cross-device data when possible —
-      // but never block startup for more than 3s if the network is slow or
-      // unreachable; the localStorage copy is already a perfectly usable
-      // fallback (see the comments on stateSupabaseSyncPromise above).
-      await Promise.race([
-        Promise.all([stateSupabaseSyncPromise, notesSupabaseSyncPromise]),
-        new Promise(resolve => setTimeout(resolve, 3000))
-      ]);
-      // LOCK_ENABLED is off, so the password gate is skipped entirely and we
-      // go straight to the app. Flip LOCK_ENABLED back to true to restore it
-      // without losing any of the lock-screen code below.
+      // Flip LOCK_ENABLED back to false to skip the PIN gate without losing
+      // any of the lock-screen code above.
       if (!LOCK_ENABLED || isUnlocked()) {
-        lockView.classList.add("hidden");
-        appView.classList.remove("hidden");
-        initApp();
+        enterApp();
       } else {
         showLock();
       }
