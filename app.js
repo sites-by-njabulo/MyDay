@@ -33,7 +33,6 @@ const ICONS = {
   calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>`,
   target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg>`,
   chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`,
-  attachment: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 11.5l-7.6 7.6a4 4 0 0 1-5.7-5.7l8.5-8.5a3 3 0 0 1 4.2 4.2l-8 8a1.5 1.5 0 0 1-2.1-2.1l7-7"/></svg>`,
   flag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v17"/><path d="M5 4.5c2-1.2 4-1.2 6 0s4 1.2 6 0v9c-2 1.2-4 1.2-6 0s-4-1.2-6 0z"/></svg>`,
   clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`,
   repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.2M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-14 5.2M4 20v-4h4"/></svg>`,
@@ -669,9 +668,6 @@ function addTaskSheetHtml() {
         <div class="todo-chip-row">
           <button type="button" class="todo-pill" id="todo-pill-date">
             ${ICONS.calendar}<span>${dateLabel}${todoDraftTime ? ` · ${formatTimeLabel(todoDraftTime)}` : ""}</span>
-          </button>
-          <button type="button" class="todo-pill" disabled aria-disabled="true">
-            ${ICONS.attachment}<span>Attachment</span>
           </button>
           <button type="button" class="todo-pill ${pInfo ? "todo-pill-set" : ""}" id="todo-pill-priority" style="${pInfo ? `--pill-color:${pInfo.color}` : ""}">
             ${ICONS.flag}<span>${pInfo ? pInfo.label.replace(" priority", "") : "Priority"}</span>
