@@ -1524,11 +1524,9 @@ button, input { font-family: inherit; }
 .notes-layout { display: flex; gap: 16px; align-items: flex-start; }
 
 .notes-folders-pane, .notes-list-pane, .notes-editor-pane {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 16px;
+  position: relative;
   width: 100%;
+  padding: 20px 16px 0;
 }
 /* Mobile: full-screen drill-down — only the active level shows. */
 .notes-layout[data-mobile-view="folders"] .notes-list-pane,
@@ -1540,7 +1538,9 @@ button, input { font-family: inherit; }
   display: none;
 }
 
-.notes-pane-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+/* Desktop-only header row ("Notes" + search at the top) — mobile uses its
+   own big-title + bottom-search-bar layout instead, built further down. */
+.notes-pane-header { display: none; align-items: center; gap: 10px; margin-bottom: 14px; }
 .notes-pane-title { flex: 1; margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .notes-topbar-spacer { width: 32px; flex: none; }
 .notes-icon-btn, .notes-back-btn {
@@ -1562,7 +1562,7 @@ button, input { font-family: inherit; }
 .notes-icon-btn svg, .notes-back-btn svg { width: 16px; height: 16px; }
 
 .notes-search {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 8px;
   border: 1px solid var(--border);
@@ -1582,19 +1582,71 @@ button, input { font-family: inherit; }
 }
 .notes-search input::placeholder { color: var(--text-secondary); }
 
-.notes-folder-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.notes-folder-item { display: flex; align-items: center; gap: 4px; }
+/* ----- Mobile-only header pieces: big bold title, back+share/more topbar ----- */
+.notes-mobile-topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.notes-mobile-topbar-end { justify-content: flex-end; }
+.notes-mobile-title { margin: 4px 0 2px; font-size: 32px; font-weight: 800; color: var(--text-primary); letter-spacing: var(--tracking-display); }
+.notes-mobile-subtitle { margin: 0 0 16px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary); }
+.notes-mobile-date { margin: 0 0 6px; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+.notes-pill-group {
+  display: flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  gap: 2px;
+}
+.notes-pill-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+}
+.notes-pill-icon svg { width: 15px; height: 15px; }
+.notes-pill-icon:disabled { color: var(--text-secondary); opacity: 0.6; cursor: default; }
+.notes-time-group-label {
+  list-style: none;
+  margin: 18px 4px 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.notes-list-rows li.notes-time-group-label:first-child { margin-top: 4px; }
+
+/* ----- Mobile-only rounded "card" groupings (desktop restyles these to a
+   transparent flex passthrough further down, to keep its existing flush
+   full-height look) ----- */
+.notes-folder-card, .notes-list-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 100px;
+}
+
+.notes-folder-list { list-style: none; margin: 0; padding: 0; }
+.notes-folder-item { border-bottom: 1px solid var(--border); }
+.notes-folder-item:last-child { border-bottom: none; }
+.notes-all-notes-row { border-bottom: 1px solid var(--border); }
 .notes-folder-row {
-  flex: 1;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
   border: none;
   background: none;
-  padding: 9px 8px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
+  padding: 13px 14px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--text-primary);
   cursor: pointer;
@@ -1606,25 +1658,25 @@ button, input { font-family: inherit; }
 .notes-folder-row.active { background: var(--accent); color: #fff; }
 .notes-folder-row.active svg { color: #fff; }
 .notes-folder-row.active .notes-folder-count { color: rgba(255, 255, 255, 0.75); }
-.notes-all-notes-row { width: 100%; margin-bottom: 10px; }
 .notes-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notes-folder-count { font-size: 12px; font-weight: 600; color: var(--text-secondary); flex: none; }
+.notes-folder-item { display: flex; align-items: center; }
+.notes-folder-item .notes-folder-row { flex: 1; }
 .notes-folder-delete {
   flex: none;
   border: none;
   background: none;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
-  padding: 6px;
-  border-radius: 50%;
-  opacity: 0;
-  transition: opacity 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart), background 0.15s var(--ease-out-quart);
+  padding: 8px 14px;
+  /* Always visible on mobile (no hover on touch); desktop dims it until
+     hover further down, to match this app's other hover-reveal delete buttons. */
+  opacity: 1;
 }
-.notes-folder-item:hover .notes-folder-delete { opacity: 1; }
-.notes-folder-delete:hover { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+.notes-folder-delete:hover { color: var(--danger); }
 
-.notes-list-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.notes-list-rows { list-style: none; margin: 0; padding: 0; }
 .notes-list-row {
   display: flex;
   flex-direction: column;
@@ -1633,12 +1685,12 @@ button, input { font-family: inherit; }
   border: none;
   border-bottom: 1px solid var(--border);
   background: none;
-  padding: 11px 8px;
-  border-radius: var(--radius-sm);
+  padding: 13px 14px;
   cursor: pointer;
   text-align: left;
   transition: background 0.15s var(--ease-out-quart);
 }
+.notes-list-card ul.notes-list-rows li:last-child .notes-list-row { border-bottom: none; }
 .notes-list-row:hover { background: var(--surface-3); }
 .notes-list-row.active { background: var(--accent-soft); }
 .notes-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -1652,6 +1704,62 @@ button, input { font-family: inherit; }
   white-space: nowrap;
 }
 .notes-empty { list-style: none; text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 24px 10px; }
+
+/* ----- Mobile-only fixed bottom bar: search pill + circular compose button ----- */
+.notes-mobile-bottombar {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.notes-search-pill {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  background: rgba(20, 21, 22, 0.85);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  padding: 11px 14px;
+}
+[data-theme="light"] .notes-search-pill { background: rgba(255, 255, 255, 0.85); }
+.notes-search-pill svg { width: 15px; height: 15px; color: var(--text-secondary); flex: none; }
+.notes-search-pill input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+.notes-search-pill input::placeholder { color: var(--text-secondary); }
+.notes-search-mic { display: flex; flex: none; color: var(--text-secondary); }
+.notes-search-mic svg { width: 15px; height: 15px; }
+.notes-compose-fab {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline-strong);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+}
+.notes-compose-fab svg { width: 18px; height: 18px; }
+.notes-compose-fab:active { transform: scale(0.94); }
+.notes-editor-compose-fab { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 45; }
 
 .note-title-input {
   display: block;
@@ -1668,16 +1776,36 @@ button, input { font-family: inherit; }
 }
 .note-title-input::placeholder { color: var(--text-secondary); }
 
-.note-toolbar { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+/* Mobile: the toolbar becomes a small fixed pill bottom-left, beside the
+   compose circle bottom-right, scrolling horizontally if it overflows. */
+.note-toolbar {
+  position: fixed;
+  left: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 45;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  max-width: calc(100% - 14px - 44px - 10px - 14px);
+  background: rgba(20, 21, 22, 0.85);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-pill);
+  padding: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+[data-theme="light"] .note-toolbar { background: rgba(255, 255, 255, 0.85); }
+.note-toolbar::-webkit-scrollbar { display: none; }
 .note-toolbar-row {
   display: flex;
   align-items: center;
   gap: 2px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  flex: none;
 }
-.note-toolbar-row::-webkit-scrollbar { display: none; }
-.note-toolbar-divider { height: 1px; background: var(--border); margin: 0; }
+.note-toolbar-divider { width: 1px; height: 20px; flex: none; background: var(--border); margin: 0 4px; }
 .note-toolbar button {
   flex: none;
   border: none;
@@ -1705,6 +1833,7 @@ button, input { font-family: inherit; }
   line-height: 1.6;
   color: var(--text-primary);
   min-height: 200px;
+  padding-bottom: 90px;
 }
 .note-body h1 { font-size: 22px; font-weight: 800; margin: 0.6em 0 0.3em; }
 .note-body h2 { font-size: 18px; font-weight: 700; margin: 0.6em 0 0.3em; }
@@ -1762,18 +1891,67 @@ button, input { font-family: inherit; }
   .notes-list-pane { flex: 0 0 300px; }
   .notes-editor-pane { flex: 1 1 auto; min-width: 0; }
 
-  /* Each pane: header (and search/title/toolbar) pinned, one scrollable region below. */
+  /* Desktop keeps its own top header+search (mobile's big-title/bottom-bar
+     pieces are hidden below); each pane: header pinned, one scroll region. */
+  .notes-pane-header { display: flex; }
+  .notes-search { display: flex; }
+  .notes-mobile-topbar, .notes-mobile-title, .notes-mobile-subtitle,
+  .notes-mobile-bottombar, .notes-mobile-date, .notes-time-group-label,
+  .notes-editor-compose-fab {
+    display: none !important;
+  }
+
   .notes-folders-pane .notes-pane-header { flex: none; padding: 20px 16px 14px; margin-bottom: 0; }
   .notes-folders-pane .notes-search { flex: none; margin: 0 16px 12px; }
-  .notes-folders-pane .notes-all-notes-row { flex: none; margin: 0 10px 8px; }
+
+  /* .notes-folder-card / .notes-list-card are mobile-only "rounded card"
+     groupings — on desktop they become a transparent flex passthrough so the
+     pinned-row + scrollable-list pattern below still spans the full pane. */
+  .notes-folder-card, .notes-list-card {
+    background: none;
+    border-radius: 0;
+    overflow: visible;
+    margin-bottom: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .notes-all-notes-row { flex: none; margin: 0 10px 8px; border-bottom: none; }
   .notes-folder-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: 0 10px 20px; }
+  .notes-folder-item { border-bottom: none; }
+  .notes-folder-row { padding: 9px 8px; border-radius: var(--radius-sm); }
+  .notes-folder-delete {
+    padding: 6px;
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart), background 0.15s var(--ease-out-quart);
+  }
+  .notes-folder-item:hover .notes-folder-delete { opacity: 1; }
+  .notes-folder-delete:hover { background: rgba(239, 68, 68, 0.1); }
 
   .notes-list-pane .notes-pane-header { flex: none; padding: 20px 16px 14px; margin-bottom: 0; }
   .notes-list-rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: 0 10px 20px; }
+  .notes-list-row { padding: 11px 8px; border-radius: var(--radius-sm); }
+  .notes-list-card ul.notes-list-rows li:last-child .notes-list-row { border-bottom: 1px solid var(--border); }
 
   .notes-editor-pane .notes-pane-header { flex: none; padding: 16px 24px 0; margin-bottom: 0; }
   .notes-editor-pane .note-title-input { flex: none; margin: 16px 24px 10px; width: auto; }
-  .notes-editor-pane .note-toolbar { flex: none; margin: 0 24px 14px; }
+  .notes-editor-pane .note-toolbar {
+    position: static;
+    flex: none;
+    flex-direction: column;
+    max-width: none;
+    background: none;
+    backdrop-filter: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0 24px 14px;
+    gap: 8px;
+  }
+  .note-toolbar-row { overflow-x: visible; }
+  .note-toolbar-divider { width: auto; height: 1px; margin: 0; }
   .note-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 24px 40px; }
   .notes-editor-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: 0; }
 

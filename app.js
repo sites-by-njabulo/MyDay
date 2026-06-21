@@ -1273,7 +1273,10 @@ let notesSearchQuery = "";
 
 function stripHtml(html) {
   const div = document.createElement("div");
-  div.innerHTML = html;
+  // textContent doesn't insert a space between separate block elements
+  // (e.g. two <p>s), so "line one</p><p>line two" would otherwise read as
+  // one run-on word in previews — add one at each block boundary first.
+  div.innerHTML = html.replace(/<\/(p|div|li|h[1-6])>/gi, " </$1>");
   return div.textContent || "";
 }
 
@@ -1283,6 +1286,26 @@ function notePreview(note) {
 
 function formatNoteDate(ts) {
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// "25 May 2026 at 21:17" — shown centered above the title on the mobile editor screen.
+function formatNoteFullDate(ts) {
+  const d = new Date(ts);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} at ${h}:${m}`;
+}
+
+// Groups the notes list the way iCloud Notes does: Today / Yesterday / Previous 7 Days / Previous 30 Days / Earlier.
+function noteTimeGroupLabel(ts) {
+  const todayKey = getTodayKey();
+  const noteKey = formatDateKey(new Date(ts));
+  const diffDays = Math.round((new Date(todayKey + "T00:00:00") - new Date(noteKey + "T00:00:00")) / 86400000);
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays <= 7) return "Previous 7 Days";
+  if (diffDays <= 30) return "Previous 30 Days";
+  return "Earlier";
 }
 
 function notesInFolder(folderId) {
@@ -1311,6 +1334,12 @@ function deleteFolder(folderId) {
   notesData.notes.forEach(n => { if (n.folderId === folderId) n.folderId = null; });
   notesData.folders = notesData.folders.filter(f => f.id !== folderId);
   saveNotesData();
+}
+
+function deleteNote(noteId) {
+  notesData.notes = notesData.notes.filter(n => n.id !== noteId);
+  saveNotesData();
+  if (activeNoteId === noteId) activeNoteId = null;
 }
 
 function renderNotes() {
@@ -1354,29 +1383,62 @@ function notesFoldersPaneHtml() {
         ${ICONS.search}
         <input type="text" id="notes-search-input" placeholder="Search all notes" value="${escapeHtml(notesSearchQuery)}" autocomplete="off" />
       </div>
-      <button class="notes-folder-row notes-all-notes-row ${activeFolderId === null ? "active" : ""}" data-folder="all">
-        ${ICONS.notes}<span class="notes-folder-name">All Notes</span><span class="notes-folder-count">${allCount}</span>
-      </button>
-      <ul class="notes-folder-list">
-        ${folderRows}
-      </ul>
+
+      <div class="notes-mobile-topbar notes-mobile-topbar-end">
+        <button class="notes-icon-btn" id="notes-add-folder-mobile" aria-label="New folder">+</button>
+      </div>
+      <h1 class="notes-mobile-title">Folders</h1>
+
+      <div class="notes-folder-card">
+        <button class="notes-folder-row notes-all-notes-row ${activeFolderId === null ? "active" : ""}" data-folder="all">
+          ${ICONS.notes}<span class="notes-folder-name">All Notes</span><span class="notes-folder-count">${allCount}</span>
+        </button>
+        <ul class="notes-folder-list">${folderRows}</ul>
+      </div>
+
+      <div class="notes-mobile-bottombar">
+        <div class="notes-search-pill">
+          ${ICONS.search}
+          <input type="text" id="notes-search-input-mobile-folders" placeholder="Search" autocomplete="off" />
+          <span class="notes-search-mic" aria-hidden="true">${ICONS.mic}</span>
+        </div>
+        <button class="notes-compose-fab" id="notes-new-note-from-folders" aria-label="New note">${ICONS.newNote}</button>
+      </div>
     </div>
   `;
+}
+
+function notesListRowHtml(n) {
+  return `
+    <li>
+      <button class="notes-list-row ${activeNoteId === n.id ? "active" : ""}" data-id="${n.id}">
+        <span class="notes-row-top"><span class="notes-row-title">${escapeHtml(n.title) || "New Note"}</span><span class="notes-row-date">${formatNoteDate(n.updatedAt)}</span></span>
+        <span class="notes-row-preview">${escapeHtml(notePreview(n)) || "No additional text"}</span>
+      </button>
+    </li>
+  `;
+}
+
+// Mobile groups notes under Today/Yesterday/Previous 7 Days/etc. labels (matching iCloud Notes);
+// desktop ignores the group headers entirely via CSS (display:none on .notes-time-group-label).
+function notesListRowsHtml(visibleNotes) {
+  if (!visibleNotes.length) return `<li class="notes-empty">No notes here yet.</li>`;
+  let html = "";
+  let lastGroup = null;
+  visibleNotes.forEach(n => {
+    const group = noteTimeGroupLabel(n.updatedAt);
+    if (group !== lastGroup) {
+      html += `<li class="notes-time-group-label">${group}</li>`;
+      lastGroup = group;
+    }
+    html += notesListRowHtml(n);
+  });
+  return html;
 }
 
 function notesListPaneHtml(visibleNotes) {
   const folder = activeFolderId ? notesData.folders.find(f => f.id === activeFolderId) : null;
   const folderLabel = folder ? folder.name : "All Notes";
-  const rowsHtml = visibleNotes.length
-    ? visibleNotes.map(n => `
-      <li>
-        <button class="notes-list-row ${activeNoteId === n.id ? "active" : ""}" data-id="${n.id}">
-          <span class="notes-row-top"><span class="notes-row-title">${escapeHtml(n.title) || "New Note"}</span><span class="notes-row-date">${formatNoteDate(n.updatedAt)}</span></span>
-          <span class="notes-row-preview">${escapeHtml(notePreview(n)) || "No additional text"}</span>
-        </button>
-      </li>
-    `).join("")
-    : `<li class="notes-empty">No notes here yet.</li>`;
 
   return `
     <div class="notes-list-pane">
@@ -1385,7 +1447,28 @@ function notesListPaneHtml(visibleNotes) {
         <h2 class="notes-pane-title">${escapeHtml(folderLabel)}</h2>
         <span class="notes-topbar-spacer"></span>
       </div>
-      <ul class="notes-list-rows">${rowsHtml}</ul>
+
+      <div class="notes-mobile-topbar">
+        <button class="notes-icon-btn" id="notes-back-to-folders-mobile" aria-label="Back">${ICONS.chevronLeft}</button>
+        <div class="notes-pill-group">
+          <button class="notes-pill-icon" disabled aria-hidden="true" title="Sharing isn't available — MyDay stores notes only on this device">${ICONS.upload}</button>
+        </div>
+      </div>
+      <h1 class="notes-mobile-title">${escapeHtml(folderLabel)}</h1>
+      <p class="notes-mobile-subtitle">${visibleNotes.length} Note${visibleNotes.length === 1 ? "" : "s"}</p>
+
+      <div class="notes-list-card">
+        <ul class="notes-list-rows">${notesListRowsHtml(visibleNotes)}</ul>
+      </div>
+
+      <div class="notes-mobile-bottombar">
+        <div class="notes-search-pill">
+          ${ICONS.search}
+          <input type="text" id="notes-search-input-mobile-list" placeholder="Search" autocomplete="off" value="${escapeHtml(notesSearchQuery)}" />
+          <span class="notes-search-mic" aria-hidden="true">${ICONS.mic}</span>
+        </div>
+        <button class="notes-compose-fab" id="notes-new-note-from-list" aria-label="New note">${ICONS.newNote}</button>
+      </div>
     </div>
   `;
 }
@@ -1399,7 +1482,17 @@ function notesEditorPaneHtml() {
         <span class="notes-topbar-spacer"></span>
         <button class="notes-icon-btn" id="notes-new-note" aria-label="New note">${ICONS.newNote}</button>
       </div>
+
+      <div class="notes-mobile-topbar">
+        <button class="notes-icon-btn" id="notes-back-to-list-mobile" aria-label="Back">${ICONS.chevronLeft}</button>
+        <div class="notes-pill-group">
+          <button class="notes-pill-icon" disabled aria-hidden="true" title="Sharing isn't available — MyDay stores notes only on this device">${ICONS.upload}</button>
+          ${note ? `<button class="notes-pill-icon" id="notes-delete-note-mobile" aria-label="Delete note">⋯</button>` : ""}
+        </div>
+      </div>
+
       ${note ? `
+        <p class="notes-mobile-date">${formatNoteFullDate(note.updatedAt)}</p>
         <input type="text" id="note-title-input" class="note-title-input" placeholder="Title" value="${escapeHtml(note.title)}" autocomplete="off" />
         <div class="note-toolbar">
           <div class="note-toolbar-row">
@@ -1425,6 +1518,8 @@ function notesEditorPaneHtml() {
           <p>No note selected.</p>
         </div>
       `}
+
+      <button class="notes-compose-fab notes-editor-compose-fab" id="notes-new-note-editor-mobile" aria-label="New note">${ICONS.newNote}</button>
     </div>
   `;
 }
@@ -1435,6 +1530,27 @@ function updateNoteListRowInPlace(note) {
   row.querySelector(".notes-row-title").textContent = note.title || "New Note";
   row.querySelector(".notes-row-date").textContent = formatNoteDate(note.updatedAt);
   row.querySelector(".notes-row-preview").textContent = notePreview(note) || "No additional text";
+}
+
+// Shared by every "+ new note" entry point (desktop header, mobile folders
+// screen, mobile list screen, mobile editor screen) — all create a note in
+// whatever folder is currently selected and jump straight into the editor.
+function handleCreateNote() {
+  const note = createNote(activeFolderId);
+  activeNoteId = note.id;
+  notesView = "editor";
+  renderNotes();
+  const titleInput = document.getElementById("note-title-input");
+  if (titleInput) titleInput.focus();
+}
+
+function handleAddFolder() {
+  const name = prompt("Folder name");
+  if (!name || !name.trim()) return;
+  const folder = createFolder(name.trim());
+  activeFolderId = folder.id;
+  notesView = "list";
+  renderNotes();
 }
 
 function attachNotesFolderEvents() {
@@ -1456,19 +1572,26 @@ function attachNotesFolderEvents() {
     });
   });
 
-  document.getElementById("notes-add-folder").addEventListener("click", function () {
-    const name = prompt("Folder name");
-    if (!name || !name.trim()) return;
-    const folder = createFolder(name.trim());
-    activeFolderId = folder.id;
-    notesView = "list";
-    renderNotes();
+  document.getElementById("notes-add-folder").addEventListener("click", handleAddFolder);
+  document.getElementById("notes-add-folder-mobile").addEventListener("click", handleAddFolder);
+  document.getElementById("notes-new-note-from-folders").addEventListener("click", handleCreateNote);
+
+  document.getElementById("notes-search-input").addEventListener("input", function (e) {
+    notesSearchQuery = e.target.value;
+    rerenderNotesListRows();
   });
 
-  const searchInput = document.getElementById("notes-search-input");
-  searchInput.addEventListener("input", function () {
-    notesSearchQuery = searchInput.value;
-    rerenderNotesListAndEditor();
+  // The Folders screen's search bar jumps to a filtered All Notes list on
+  // Enter (matching real Notes apps, where folder-screen search is really a
+  // global note search) rather than filtering live, since live-filtering
+  // here would mean a full re-render on every keystroke — which would steal
+  // focus from this very input (it lives inside the pane being rebuilt).
+  document.getElementById("notes-search-input-mobile-folders").addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    notesSearchQuery = e.target.value;
+    activeFolderId = null;
+    notesView = "list";
+    renderNotes();
   });
 }
 
@@ -1477,12 +1600,22 @@ function attachNotesListEvents() {
     notesView = "folders";
     renderNotes();
   });
+  document.getElementById("notes-back-to-folders-mobile").addEventListener("click", function () {
+    notesView = "folders";
+    renderNotes();
+  });
+  document.getElementById("notes-new-note-from-list").addEventListener("click", handleCreateNote);
   document.querySelectorAll(".notes-list-row").forEach(btn => {
     btn.addEventListener("click", function () {
       activeNoteId = btn.dataset.id;
       notesView = "editor";
       renderNotes();
     });
+  });
+
+  document.getElementById("notes-search-input-mobile-list").addEventListener("input", function (e) {
+    notesSearchQuery = e.target.value;
+    rerenderNotesListRows();
   });
 }
 
@@ -1491,14 +1624,22 @@ function attachNotesEditorEvents() {
     notesView = "list";
     renderNotes();
   });
-  document.getElementById("notes-new-note").addEventListener("click", function () {
-    const note = createNote(activeFolderId);
-    activeNoteId = note.id;
-    notesView = "editor";
+  document.getElementById("notes-back-to-list-mobile").addEventListener("click", function () {
+    notesView = "list";
     renderNotes();
-    const titleInput = document.getElementById("note-title-input");
-    if (titleInput) titleInput.focus();
   });
+  document.getElementById("notes-new-note").addEventListener("click", handleCreateNote);
+  document.getElementById("notes-new-note-editor-mobile").addEventListener("click", handleCreateNote);
+
+  const deleteBtn = document.getElementById("notes-delete-note-mobile");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", function () {
+      if (!confirm("Delete this note? This can't be undone.")) return;
+      deleteNote(activeNoteId);
+      notesView = "list";
+      renderNotes();
+    });
+  }
 
   const titleInput = document.getElementById("note-title-input");
   const body = document.getElementById("note-body");
@@ -1532,18 +1673,32 @@ function attachNotesEditorEvents() {
   });
 }
 
-// Search re-renders only the list + editor panes, never the folders pane,
-// so the search input itself (which lives in the folders pane) keeps focus
-// while the user types.
-function rerenderNotesListAndEditor() {
+// Search re-renders only the rows inside the notes list (and the editor pane,
+// but only when the active note actually changes) — never the search inputs
+// themselves or the rest of either pane, so whichever search field the user
+// is typing in (desktop's, in the folders pane, or mobile's, in the list
+// pane) never loses focus mid-keystroke.
+function rerenderNotesListRows() {
   const visibleNotes = notesInFolder(activeFolderId);
-  if (!activeNoteId || !visibleNotes.some(n => n.id === activeNoteId)) {
-    activeNoteId = visibleNotes.length ? visibleNotes[0].id : null;
+  const activeNoteChanged = !activeNoteId || !visibleNotes.some(n => n.id === activeNoteId);
+  if (activeNoteChanged) activeNoteId = visibleNotes.length ? visibleNotes[0].id : null;
+
+  document.querySelector(".notes-list-rows").innerHTML = notesListRowsHtml(visibleNotes);
+  document.querySelectorAll(".notes-list-row").forEach(btn => {
+    btn.addEventListener("click", function () {
+      activeNoteId = btn.dataset.id;
+      notesView = "editor";
+      renderNotes();
+    });
+  });
+  document.querySelectorAll(".notes-mobile-subtitle").forEach(el => {
+    el.textContent = `${visibleNotes.length} Note${visibleNotes.length === 1 ? "" : "s"}`;
+  });
+
+  if (activeNoteChanged) {
+    document.querySelector(".notes-editor-pane").outerHTML = notesEditorPaneHtml();
+    attachNotesEditorEvents();
   }
-  document.querySelector(".notes-list-pane").outerHTML = notesListPaneHtml(visibleNotes);
-  document.querySelector(".notes-editor-pane").outerHTML = notesEditorPaneHtml();
-  attachNotesListEvents();
-  attachNotesEditorEvents();
 }
 
 /* ==========================================================
