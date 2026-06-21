@@ -42,7 +42,8 @@ const ICONS = {
   search: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>`,
   listBullet: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>`,
   listNumber: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><text x="1.5" y="8.5" font-size="6.5" fill="currentColor" stroke="none">1</text><text x="1.5" y="14.5" font-size="6.5" fill="currentColor" stroke="none">2</text><text x="1.5" y="20.5" font-size="6.5" fill="currentColor" stroke="none">3</text><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>`,
-  newNote: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`
+  newNote: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`,
+  mic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>`
 };
 
 /* ==========================================================
@@ -250,6 +251,11 @@ function showSection(name) {
   let navTarget = (name === "settings" || name === "video") ? "you" : name;
   if (name === "home" && homeTab === "challenge") navTarget = "challenge";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === navTarget));
+  // The Add Task FAB (and its voice-input companion button) belong only to
+  // the To-Do list view — hide both by default on every navigation;
+  // renderTodo() is the only place allowed to re-show them.
+  document.getElementById("todo-fab").classList.add("hidden");
+  document.getElementById("voice-fab").classList.add("hidden");
   renderSection(name);
 }
 
@@ -486,12 +492,35 @@ function renderTodo() {
     });
   });
 
+  // Delegated once here, on the freshly-created container — renderTodoList()
+  // runs repeatedly (every toggle/delete/add) and only replaces this
+  // container's innerHTML, never the container itself, so attaching the
+  // listener again inside renderTodoList() would stack a duplicate handler
+  // on every single render (the cause of the checkbox "does nothing /
+  // freezes" bug: N stacked handlers means N toggles fire per click).
+  document.getElementById("todo-view-content").addEventListener("click", function (e) {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const li = btn.closest(".todo-item");
+    const id = li.dataset.id;
+    if (btn.dataset.action === "toggle") {
+      const todo = state.todos.find(t => t.id === id);
+      todo.done = !todo.done;
+    } else if (btn.dataset.action === "delete") {
+      state.todos = state.todos.filter(t => t.id !== id);
+    }
+    saveState();
+    renderTodoList();
+  });
+
   if (todoView === "list") {
     renderTodoList();
     document.getElementById("todo-fab").classList.remove("hidden");
+    if (speechRecognitionSupported()) document.getElementById("voice-fab").classList.remove("hidden");
   } else {
     renderCalendar("todo-view-content");
     document.getElementById("todo-fab").classList.add("hidden");
+    document.getElementById("voice-fab").classList.add("hidden");
   }
 }
 
@@ -524,30 +553,15 @@ function renderTodoList() {
     ${upcomingHtml}
   `;
 
-  document.getElementById("todo-add-inline").addEventListener("click", openTodoSheet);
-
-  document.getElementById("todo-view-content").addEventListener("click", function (e) {
-    const btn = e.target.closest("button[data-action]");
-    if (!btn) return;
-    const li = btn.closest(".todo-item");
-    const id = li.dataset.id;
-    if (btn.dataset.action === "toggle") {
-      const todo = state.todos.find(t => t.id === id);
-      todo.done = !todo.done;
-    } else if (btn.dataset.action === "delete") {
-      state.todos = state.todos.filter(t => t.id !== id);
-    }
-    saveState();
-    renderTodoList();
-  });
+  document.getElementById("todo-add-inline").addEventListener("click", () => openTodoSheet());
 }
 
 /* ----- Add Task sheet (mobile: bottom sheet · desktop: centered modal) ----- */
 
-function openTodoSheet() {
+function openTodoSheet(initialText = "") {
   todoSheetOpen = true;
   todoDateSubSheetOpen = false;
-  todoDraftText = "";
+  todoDraftText = initialText;
   todoDraftDescription = "";
   todoDraftDate = null;
   todoDraftTime = null;
@@ -576,6 +590,50 @@ function closeTodoSheet() {
     todoDateSubSheetOpen = false;
     root.innerHTML = "";
   }, 200);
+}
+
+/* ----- Voice-to-task (Web Speech API) ----- */
+
+function speechRecognitionSupported() {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+let activeRecognition = null;
+
+function startVoiceCapture() {
+  const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionImpl) return;
+
+  const voiceBtn = document.getElementById("voice-fab");
+  if (activeRecognition) {
+    activeRecognition.stop();
+    return;
+  }
+
+  const recognition = new SpeechRecognitionImpl();
+  activeRecognition = recognition;
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  voiceBtn.classList.add("listening");
+
+  recognition.addEventListener("result", function (e) {
+    const transcript = e.results[0][0].transcript.trim();
+    if (transcript) openTodoSheet(transcript);
+  });
+
+  recognition.addEventListener("error", function () {
+    activeRecognition = null;
+    voiceBtn.classList.remove("listening");
+  });
+
+  recognition.addEventListener("end", function () {
+    activeRecognition = null;
+    voiceBtn.classList.remove("listening");
+  });
+
+  recognition.start();
 }
 
 function renderTodoSheet() {
@@ -1597,7 +1655,8 @@ function registerServiceWorker() {
 function initApp() {
   ensureDayRecord(getTodayKey());
   document.querySelectorAll(".nav-avatar").forEach(el => el.textContent = USER_NAME.charAt(0));
-  document.getElementById("todo-fab").addEventListener("click", openTodoSheet);
+  document.getElementById("todo-fab").addEventListener("click", () => openTodoSheet());
+  document.getElementById("voice-fab").addEventListener("click", startVoiceCapture);
   showSection("home");
   registerServiceWorker();
   armMidnightWatcher();
