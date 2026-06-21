@@ -1053,6 +1053,7 @@ function renderChallenge(targetId = "page-challenge", skipRingAnimation = false)
       <h1 class="page-title">$10K Challenge</h1>
       <p class="page-sub">Day ${dayNumber} of ${c.durationDays}</p>
     </div>
+    <button id="reset-challenge-btn" class="challenge-reset-link">Reset Challenge</button>
 
     <div class="challenge-stats">
       <div class="challenge-stat">
@@ -1080,6 +1081,14 @@ function renderChallenge(targetId = "page-challenge", skipRingAnimation = false)
     <h2 class="section-heading">Income log</h2>
     <ul class="entry-list">${entriesHtml}</ul>
   `;
+
+  document.getElementById("reset-challenge-btn").addEventListener("click", function () {
+    if (!confirm("Reset the $10K Challenge? This clears your start date and income log so you can start fresh — it can't be undone.")) return;
+    c.startDate = null;
+    c.entries = [];
+    saveState();
+    renderChallenge(targetId);
+  });
 
   document.getElementById("income-form").addEventListener("submit", function (e) {
     e.preventDefault();
