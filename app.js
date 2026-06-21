@@ -258,10 +258,12 @@ function showSection(name) {
   if (name === "home" && homeTab === "challenge") navTarget = "challenge";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === navTarget));
   // The Add Task FAB (and its voice-input companion button) belong only to
-  // the To-Do list view — hide both by default on every navigation;
-  // renderTodo() is the only place allowed to re-show them.
+  // the To-Do list view, and the mobile Notes bottom bar only to Notes —
+  // hide all three by default on every navigation; renderTodo()/renderNotes()
+  // are the only places allowed to re-show their own.
   document.getElementById("todo-fab").classList.add("hidden");
   document.getElementById("voice-fab").classList.add("hidden");
+  document.getElementById("notes-mobile-bar").classList.add("hidden");
   renderSection(name);
 }
 
@@ -1371,6 +1373,61 @@ function renderNotes() {
   attachNotesFolderEvents();
   attachNotesListEvents();
   attachNotesEditorEvents();
+  renderNotesMobileBar();
+}
+
+// Mobile's search bar + compose button (and, in the editor, the formatting
+// toolbar pill) are rendered into #notes-mobile-bar — a fixed-position
+// element living OUTSIDE #page-notes, as a direct sibling of .app-shell.
+// They can't live inside the page itself: .page.active plays a translateY
+// entrance animation, and CSS treats translateY(0) (the animation's "both"
+// fill-mode resting value, not the keyword "none") as a non-none transform
+// for as long as the page stays active — which makes the page a containing
+// block for any fixed-position descendant, anchoring it to the PAGE's own
+// box instead of the viewport. That's why this can't just be a fixed div
+// nested in one of the panes (it was, and silently floated at the top of
+// the page's content instead of pinning to the screen's bottom edge).
+function renderNotesMobileBar() {
+  const bar = document.getElementById("notes-mobile-bar");
+  bar.classList.remove("hidden");
+  if (notesView === "editor") {
+    const note = activeNoteId ? notesData.notes.find(n => n.id === activeNoteId) : null;
+    bar.innerHTML = `
+      ${note ? `<div class="note-toolbar note-toolbar-external">${noteToolbarButtonsHtml()}</div>` : `<span class="notes-mobile-bar-spacer"></span>`}
+      <button class="notes-compose-fab" id="notes-new-note-editor-mobile" aria-label="New note">${ICONS.newNote}</button>
+    `;
+    if (note) wireToolbarButtons(bar);
+    document.getElementById("notes-new-note-editor-mobile").addEventListener("click", handleCreateNote);
+  } else {
+    bar.innerHTML = `
+      <div class="notes-search-pill">
+        ${ICONS.search}
+        <input type="text" id="notes-search-input-mobile" placeholder="Search" autocomplete="off" value="${notesView === "list" ? escapeHtml(notesSearchQuery) : ""}" />
+        <span class="notes-search-mic" aria-hidden="true">${ICONS.mic}</span>
+      </div>
+      <button class="notes-compose-fab" id="notes-new-note-mobile" aria-label="New note">${ICONS.newNote}</button>
+    `;
+    document.getElementById("notes-new-note-mobile").addEventListener("click", handleCreateNote);
+    const searchInput = document.getElementById("notes-search-input-mobile");
+    if (notesView === "list") {
+      searchInput.addEventListener("input", function (e) {
+        notesSearchQuery = e.target.value;
+        rerenderNotesListRows();
+      });
+    } else {
+      // Folders screen: search jumps to a filtered All Notes list on Enter
+      // (mirrors real Notes apps, where folder-screen search is a global
+      // note search) instead of filtering live, which would mean rebuilding
+      // this very bar — and stealing focus from its own input — every keystroke.
+      searchInput.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter") return;
+        notesSearchQuery = e.target.value;
+        activeFolderId = null;
+        notesView = "list";
+        renderNotes();
+      });
+    }
+  }
 }
 
 function notesFoldersPaneHtml() {
@@ -1398,9 +1455,6 @@ function notesFoldersPaneHtml() {
         <input type="text" id="notes-search-input" placeholder="Search all notes" value="${escapeHtml(notesSearchQuery)}" autocomplete="off" />
       </div>
 
-      <div class="notes-mobile-topbar notes-mobile-topbar-end">
-        <button class="notes-icon-btn" id="notes-add-folder-mobile" aria-label="New folder">+</button>
-      </div>
       <h1 class="notes-mobile-title">Folders</h1>
 
       <div class="notes-folder-card">
@@ -1408,15 +1462,6 @@ function notesFoldersPaneHtml() {
           ${ICONS.notes}<span class="notes-folder-name">All Notes</span><span class="notes-folder-count">${allCount}</span>
         </button>
         <ul class="notes-folder-list">${folderRows}</ul>
-      </div>
-
-      <div class="notes-mobile-bottombar">
-        <div class="notes-search-pill">
-          ${ICONS.search}
-          <input type="text" id="notes-search-input-mobile-folders" placeholder="Search" autocomplete="off" />
-          <span class="notes-search-mic" aria-hidden="true">${ICONS.mic}</span>
-        </div>
-        <button class="notes-compose-fab" id="notes-new-note-from-folders" aria-label="New note">${ICONS.newNote}</button>
       </div>
     </div>
   `;
@@ -1474,15 +1519,6 @@ function notesListPaneHtml(visibleNotes) {
       <div class="notes-list-card">
         <ul class="notes-list-rows">${notesListRowsHtml(visibleNotes)}</ul>
       </div>
-
-      <div class="notes-mobile-bottombar">
-        <div class="notes-search-pill">
-          ${ICONS.search}
-          <input type="text" id="notes-search-input-mobile-list" placeholder="Search" autocomplete="off" value="${escapeHtml(notesSearchQuery)}" />
-          <span class="notes-search-mic" aria-hidden="true">${ICONS.mic}</span>
-        </div>
-        <button class="notes-compose-fab" id="notes-new-note-from-list" aria-label="New note">${ICONS.newNote}</button>
-      </div>
     </div>
   `;
 }
@@ -1508,34 +1544,71 @@ function notesEditorPaneHtml() {
       ${note ? `
         <p class="notes-mobile-date">${formatNoteFullDate(note.updatedAt)}</p>
         <input type="text" id="note-title-input" class="note-title-input" placeholder="Title" value="${escapeHtml(note.title)}" autocomplete="off" />
-        <div class="note-toolbar">
-          <div class="note-toolbar-row">
-            <button type="button" data-cmd="bold" aria-label="Bold"><b>B</b></button>
-            <button type="button" data-cmd="italic" aria-label="Italic"><i>I</i></button>
-            <button type="button" data-cmd="underline" aria-label="Underline"><u>U</u></button>
-            <button type="button" data-cmd="strikeThrough" aria-label="Strikethrough"><s>S</s></button>
-          </div>
-          <div class="note-toolbar-divider"></div>
-          <div class="note-toolbar-row">
-            <button type="button" data-cmd="formatBlock" data-val="H1">Title</button>
-            <button type="button" data-cmd="formatBlock" data-val="H2">Heading</button>
-            <button type="button" data-cmd="formatBlock" data-val="H3">Subheading</button>
-            <button type="button" data-cmd="formatBlock" data-val="P">Body</button>
-            <button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list">${ICONS.listBullet}</button>
-            <button type="button" data-cmd="insertOrderedList" aria-label="Numbered list">${ICONS.listNumber}</button>
-            <button type="button" data-action="checklist" aria-label="Checklist">${ICONS.check}</button>
-          </div>
-        </div>
+        <div class="note-toolbar">${noteToolbarButtonsHtml()}</div>
         <div class="note-body" id="note-body" contenteditable="true">${note.bodyHtml}</div>
       ` : `
         <div class="notes-editor-empty">
           <p>No note selected.</p>
         </div>
       `}
-
-      <button class="notes-compose-fab notes-editor-compose-fab" id="notes-new-note-editor-mobile" aria-label="New note">${ICONS.newNote}</button>
     </div>
   `;
+}
+
+function noteToolbarButtonsHtml() {
+  return `
+    <div class="note-toolbar-row">
+      <button type="button" data-cmd="bold" aria-label="Bold"><b>B</b></button>
+      <button type="button" data-cmd="italic" aria-label="Italic"><i>I</i></button>
+      <button type="button" data-cmd="underline" aria-label="Underline"><u>U</u></button>
+      <button type="button" data-cmd="strikeThrough" aria-label="Strikethrough"><s>S</s></button>
+    </div>
+    <div class="note-toolbar-divider"></div>
+    <div class="note-toolbar-row">
+      <button type="button" data-cmd="formatBlock" data-val="H1">Title</button>
+      <button type="button" data-cmd="formatBlock" data-val="H2">Heading</button>
+      <button type="button" data-cmd="formatBlock" data-val="H3">Subheading</button>
+      <button type="button" data-cmd="formatBlock" data-val="P">Body</button>
+      <button type="button" data-cmd="insertUnorderedList" aria-label="Bulleted list">${ICONS.listBullet}</button>
+      <button type="button" data-cmd="insertOrderedList" aria-label="Numbered list">${ICONS.listNumber}</button>
+      <button type="button" data-action="checklist" aria-label="Checklist">${ICONS.check}</button>
+    </div>
+  `;
+}
+
+// Shared by the desktop inline toolbar and the external mobile toolbar pill
+// (#notes-mobile-bar) so both can format the one active note consistently.
+function persistActiveNote() {
+  const note = notesData.notes.find(n => n.id === activeNoteId);
+  const titleInput = document.getElementById("note-title-input");
+  const body = document.getElementById("note-body");
+  if (!note || !titleInput || !body) return;
+  note.title = titleInput.value;
+  note.bodyHtml = body.innerHTML;
+  note.updatedAt = Date.now();
+  saveNotesData();
+  updateNoteListRowInPlace(note);
+}
+
+function wireToolbarButtons(container) {
+  const body = document.getElementById("note-body");
+  if (!body) return;
+  container.querySelectorAll("button[data-cmd]").forEach(btn => {
+    btn.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      document.execCommand(btn.dataset.cmd, false, btn.dataset.val || null);
+      persistActiveNote();
+    });
+  });
+  const checklistBtn = container.querySelector('button[data-action="checklist"]');
+  if (checklistBtn) {
+    checklistBtn.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      body.focus();
+      document.execCommand("insertHTML", false, '<ul class="note-checklist"><li><input type="checkbox">List item</li></ul>');
+      persistActiveNote();
+    });
+  }
 }
 
 function updateNoteListRowInPlace(note) {
@@ -1587,25 +1660,10 @@ function attachNotesFolderEvents() {
   });
 
   document.getElementById("notes-add-folder").addEventListener("click", handleAddFolder);
-  document.getElementById("notes-add-folder-mobile").addEventListener("click", handleAddFolder);
-  document.getElementById("notes-new-note-from-folders").addEventListener("click", handleCreateNote);
 
   document.getElementById("notes-search-input").addEventListener("input", function (e) {
     notesSearchQuery = e.target.value;
     rerenderNotesListRows();
-  });
-
-  // The Folders screen's search bar jumps to a filtered All Notes list on
-  // Enter (matching real Notes apps, where folder-screen search is really a
-  // global note search) rather than filtering live, since live-filtering
-  // here would mean a full re-render on every keystroke — which would steal
-  // focus from this very input (it lives inside the pane being rebuilt).
-  document.getElementById("notes-search-input-mobile-folders").addEventListener("keydown", function (e) {
-    if (e.key !== "Enter") return;
-    notesSearchQuery = e.target.value;
-    activeFolderId = null;
-    notesView = "list";
-    renderNotes();
   });
 }
 
@@ -1618,18 +1676,12 @@ function attachNotesListEvents() {
     notesView = "folders";
     renderNotes();
   });
-  document.getElementById("notes-new-note-from-list").addEventListener("click", handleCreateNote);
   document.querySelectorAll(".notes-list-row").forEach(btn => {
     btn.addEventListener("click", function () {
       activeNoteId = btn.dataset.id;
       notesView = "editor";
       renderNotes();
     });
-  });
-
-  document.getElementById("notes-search-input-mobile-list").addEventListener("input", function (e) {
-    notesSearchQuery = e.target.value;
-    rerenderNotesListRows();
   });
 }
 
@@ -1643,7 +1695,6 @@ function attachNotesEditorEvents() {
     renderNotes();
   });
   document.getElementById("notes-new-note").addEventListener("click", handleCreateNote);
-  document.getElementById("notes-new-note-editor-mobile").addEventListener("click", handleCreateNote);
 
   const deleteBtn = document.getElementById("notes-delete-note-mobile");
   if (deleteBtn) {
@@ -1659,32 +1710,10 @@ function attachNotesEditorEvents() {
   const body = document.getElementById("note-body");
   if (!titleInput || !body) return;
 
-  const note = notesData.notes.find(n => n.id === activeNoteId);
+  titleInput.addEventListener("input", persistActiveNote);
+  body.addEventListener("input", persistActiveNote);
 
-  function persist() {
-    note.title = titleInput.value;
-    note.bodyHtml = body.innerHTML;
-    note.updatedAt = Date.now();
-    saveNotesData();
-    updateNoteListRowInPlace(note);
-  }
-
-  titleInput.addEventListener("input", persist);
-  body.addEventListener("input", persist);
-
-  document.querySelectorAll(".note-toolbar button[data-cmd]").forEach(btn => {
-    btn.addEventListener("mousedown", function (e) {
-      e.preventDefault();
-      document.execCommand(btn.dataset.cmd, false, btn.dataset.val || null);
-      persist();
-    });
-  });
-  document.querySelector('.note-toolbar button[data-action="checklist"]').addEventListener("mousedown", function (e) {
-    e.preventDefault();
-    body.focus();
-    document.execCommand("insertHTML", false, '<ul class="note-checklist"><li><input type="checkbox">List item</li></ul>');
-    persist();
-  });
+  wireToolbarButtons(document.querySelector(".notes-editor-pane .note-toolbar"));
 }
 
 // Search re-renders only the rows inside the notes list (and the editor pane,

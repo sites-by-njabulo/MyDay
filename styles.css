@@ -1580,7 +1580,6 @@ button, input { font-family: inherit; }
 
 /* ----- Mobile-only header pieces: big bold title, back+share/more topbar ----- */
 .notes-mobile-topbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
-.notes-mobile-topbar-end { justify-content: flex-end; }
 .notes-mobile-title { margin: 4px 0 2px; font-size: 32px; font-weight: 800; color: var(--text-primary); letter-spacing: var(--tracking-display); }
 .notes-mobile-subtitle { margin: 0 0 16px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary); }
 .notes-mobile-date { margin: 0 0 6px; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
@@ -1702,16 +1701,30 @@ button, input { font-family: inherit; }
 .notes-empty { list-style: none; text-align: center; color: var(--text-secondary); font-size: 13.5px; padding: 24px 10px; }
 
 /* ----- Mobile-only fixed bottom bar: search pill + circular compose button ----- */
-.notes-mobile-bottombar {
+/* #notes-mobile-bar lives in index.html as a direct sibling of .app-shell —
+   NOT inside #page-notes — specifically so position:fixed here anchors to
+   the real viewport. (.page.active plays a translateY entrance animation;
+   CSS treats the animation's resting transform: translateY(0) as non-none,
+   so .page.active is a containing block for fixed descendants for as long
+   as it stays active, anchoring them to the page's own box instead of the
+   screen. Nesting this bar inside a pane silently floated it at the top of
+   the page's content instead of pinning it to the bottom of the screen.) */
+#notes-mobile-bar {
   position: fixed;
   left: 14px;
   right: 14px;
-  bottom: calc(14px + env(safe-area-inset-bottom));
+  /* Sits above the floating bottom-nav pill, matching .todo-fab's own
+     bottom offset — bottom:14px alone would sit exactly UNDER the nav
+     (also bottom:14px), and the nav's higher z-index would silently eat
+     every tap meant for the search bar / compose button underneath it. */
+  bottom: calc(90px + env(safe-area-inset-bottom));
   z-index: 45;
   display: flex;
   align-items: center;
   gap: 10px;
 }
+#notes-mobile-bar.hidden { display: none; }
+.notes-mobile-bar-spacer { flex: 1; }
 .notes-search-pill {
   flex: 1;
   display: flex;
@@ -1755,7 +1768,6 @@ button, input { font-family: inherit; }
 }
 .notes-compose-fab svg { width: 18px; height: 18px; }
 .notes-compose-fab:active { transform: scale(0.94); }
-.notes-editor-compose-fab { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 45; }
 
 .note-title-input {
   display: block;
@@ -1772,18 +1784,19 @@ button, input { font-family: inherit; }
 }
 .note-title-input::placeholder { color: var(--text-secondary); }
 
-/* Mobile: the toolbar becomes a small fixed pill bottom-left, beside the
-   compose circle bottom-right, scrolling horizontally if it overflows. */
-.note-toolbar {
-  position: fixed;
-  left: 14px;
-  bottom: calc(14px + env(safe-area-inset-bottom));
-  z-index: 45;
+/* The real .note-toolbar (inline, below the title) is desktop-only — see
+   the desktop media query further down, where it's switched back to a
+   normal flex column in the document. On mobile, formatting instead happens
+   through .note-toolbar-external, a copy of the same buttons rendered into
+   the fixed #notes-mobile-bar (see the comment on that selector above). */
+.note-toolbar { display: none; }
+.note-toolbar-external {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 2px;
-  max-width: calc(100% - 14px - 44px - 10px - 14px);
   background: rgba(20, 21, 22, 0.85);
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
@@ -1793,8 +1806,8 @@ button, input { font-family: inherit; }
   overflow-x: auto;
   scrollbar-width: none;
 }
-[data-theme="light"] .note-toolbar { background: rgba(255, 255, 255, 0.85); }
-.note-toolbar::-webkit-scrollbar { display: none; }
+[data-theme="light"] .note-toolbar-external { background: rgba(255, 255, 255, 0.85); }
+.note-toolbar-external::-webkit-scrollbar { display: none; }
 .note-toolbar-row {
   display: flex;
   align-items: center;
@@ -1892,8 +1905,8 @@ button, input { font-family: inherit; }
   .notes-pane-header { display: flex; }
   .notes-search { display: flex; }
   .notes-mobile-topbar, .notes-mobile-title, .notes-mobile-subtitle,
-  .notes-mobile-bottombar, .notes-mobile-date, .notes-time-group-label,
-  .notes-editor-compose-fab {
+  .notes-mobile-date, .notes-time-group-label,
+  #notes-mobile-bar {
     display: none !important;
   }
 
@@ -1934,12 +1947,10 @@ button, input { font-family: inherit; }
   .notes-editor-pane .notes-pane-header { flex: none; padding: 16px 24px 0; margin-bottom: 0; }
   .notes-editor-pane .note-title-input { flex: none; margin: 16px 24px 10px; width: auto; }
   .notes-editor-pane .note-toolbar {
-    position: static;
+    display: flex;
     flex: none;
     flex-direction: column;
-    max-width: none;
     background: none;
-    backdrop-filter: none;
     border: none;
     border-radius: 0;
     padding: 0;
