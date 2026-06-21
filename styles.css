@@ -2214,8 +2214,17 @@ button, input { font-family: inherit; }
     flex-direction: column;
     background: none;
     border: none;
+    /* This box's own width already exactly matches .note-title-input's (same
+       24px side margins, same parent) — confirmed by inspecting computed
+       layout directly, not just reading the CSS. What actually read as
+       "narrower" was that nothing made that width visible: button rows are
+       naturally left-packed and far short of full width, with no border or
+       background of their own to prove the container reaches the same right
+       edge as the title's divider does. Adding one here is the fix — not a
+       width change, since there wasn't a width bug to begin with. */
+    border-bottom: 1px solid var(--border);
     border-radius: 0;
-    padding: 0;
+    padding: 0 0 14px;
     margin: 0 24px 14px;
     gap: 8px;
   }
