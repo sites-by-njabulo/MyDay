@@ -595,6 +595,18 @@ button, input { font-family: inherit; }
     opacity: 1;
     pointer-events: auto;
   }
+  /* The Notes page's own folders-column header has its own sidebar
+     toggle (one of its three header icons) that works as both collapse
+     AND reopen, since it's better-positioned to sit clear of Notes' own
+     header content (which starts only 16px from the edge — much closer
+     than other pages' 40px #main-content padding, which is what the
+     floating button below is actually sized to clear) than this floating
+     button ever was. Always hidden here, in both sidebar states, so it
+     never has a chance to overlap Notes' content. */
+  .app-shell:has(#page-notes.active) ~ .sidebar-reopen-btn {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
 }
 
 @keyframes modalFadeScaleIn {
@@ -1675,6 +1687,15 @@ button, input { font-family: inherit; }
 .notes-pane-header { display: none; align-items: center; gap: 10px; margin-bottom: 14px; }
 .notes-pane-title { flex: 1; margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .notes-topbar-spacer { width: 32px; flex: none; }
+.notes-header-icons { display: flex; align-items: center; gap: 8px; flex: none; }
+/* Buttons that only make sense on the desktop 3-pane layout (sidebar
+   collapse, the focus-mode toggle, the editor's delete-note button) — the
+   mobile drill-down has its own equivalents (or no equivalent concept, in
+   the sidebar's case) elsewhere, so these would be redundant/confusing
+   there. Most of their containing headers are already mobile-hidden
+   entirely (.notes-pane-header above), but this also covers any that get
+   reused in a mobile-visible context later. */
+.notes-desktop-only-btn { display: none; }
 .notes-icon-btn, .notes-back-btn {
   flex: none;
   width: 32px;
@@ -1692,6 +1713,16 @@ button, input { font-family: inherit; }
 }
 .notes-icon-btn:hover, .notes-back-btn:hover { border-color: var(--hairline-strong); }
 .notes-icon-btn svg, .notes-back-btn svg { width: 16px; height: 16px; }
+.notes-icon-btn-danger-active, .notes-icon-btn-danger-active:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.notes-icon-btn-active, .notes-icon-btn-active:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
 
 .notes-search {
   display: none;
@@ -1803,6 +1834,23 @@ button, input { font-family: inherit; }
 .notes-folder-count { font-size: 12px; font-weight: 600; color: var(--text-secondary); flex: none; }
 .notes-folder-item { display: flex; align-items: center; }
 .notes-folder-item .notes-folder-row { flex: 1; }
+/* Bulk-delete selection mode: a folder marked for deletion turns red (the
+   destructive-action color) rather than the usual accent purple, so it
+   reads as "about to be deleted" rather than "currently being viewed" even
+   if it happens to also be the active folder. */
+.notes-folder-row.marked-for-delete,
+.notes-folder-row.marked-for-delete:hover { background: rgba(239, 68, 68, 0.16); color: var(--text-primary); }
+.notes-folder-row.marked-for-delete svg { color: var(--danger); }
+.notes-folder-select-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  transition: background 0.15s var(--ease-out-quart), border-color 0.15s var(--ease-out-quart);
+}
+.notes-folder-select-dot.checked { background: var(--danger); border-color: var(--danger); }
 .notes-folder-delete {
   flex: none;
   border: none;
@@ -2169,6 +2217,40 @@ button, input { font-family: inherit; }
   .notes-editor-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: 0; }
 
   .notes-back-btn { display: none; }
+  .notes-desktop-only-btn { display: flex; }
+
+  /* Fix 4 — focus mode: collapses the folders/list panes (same width+
+     padding+border-width transition technique already used for the
+     app-wide sidebar collapse) so the editor pane's flex:1 1 auto can
+     expand to fill the freed space, then centers the editor's own content
+     within that newly-wide pane (Google Docs-style) instead of letting it
+     just stretch edge-to-edge. Independent of .sidebar-collapsed — these
+     two states live on different elements (.app-shell vs #notes-layout)
+     and never reference each other. */
+  .notes-folders-pane, .notes-list-pane {
+    transition: flex-basis 0.3s var(--ease-out-quart), padding 0.3s var(--ease-out-quart), border-right-width 0.3s var(--ease-out-quart);
+  }
+  .notes-layout.focus-mode .notes-folders-pane,
+  .notes-layout.focus-mode .notes-list-pane {
+    flex-basis: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-width: 0;
+    overflow: hidden;
+  }
+  .notes-layout.focus-mode .notes-editor-pane .note-title-input {
+    max-width: 700px;
+    width: 100%;
+    margin: 16px auto 10px;
+  }
+  .notes-layout.focus-mode .notes-editor-pane .note-toolbar {
+    max-width: 700px;
+    margin: 0 auto 14px;
+  }
+  .notes-layout.focus-mode .notes-editor-pane .note-body {
+    max-width: 700px;
+    margin: 0 auto;
+  }
 }
 
 /* ===== Settings ===== */

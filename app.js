@@ -48,6 +48,9 @@ const ICONS = {
   calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>`,
   target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg>`,
   chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`,
+  chevronRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`,
+  trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
+  expand: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M9 20H4v-5"/><path d="M15 20h5v-5"/></svg>`,
   flag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v17"/><path d="M5 4.5c2-1.2 4-1.2 6 0s4 1.2 6 0v9c-2 1.2-4 1.2-6 0s-4-1.2-6 0z"/></svg>`,
   clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`,
   repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.2M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-14 5.2M4 20v-4h4"/></svg>`,
@@ -1481,6 +1484,9 @@ let notesView = "folders"; // mobile drill-down only: "folders" | "list" | "edit
 let activeFolderId = null; // null = "All Notes"
 let activeNoteId = null;
 let notesSearchQuery = "";
+let folderDeleteMode = false; // desktop only: bulk-select folders to delete
+let selectedFolderIdsForDelete = new Set();
+let notesFocusMode = false; // desktop only: collapses folders/list panes, centers the editor
 
 function stripHtml(html) {
   const div = document.createElement("div");
@@ -1559,7 +1565,7 @@ function renderNotes() {
     activeNoteId = visibleNotes.length ? visibleNotes[0].id : null;
   }
   document.getElementById("page-notes").innerHTML = `
-    <div class="notes-layout" id="notes-layout" data-mobile-view="${notesView}">
+    <div class="notes-layout ${notesFocusMode ? "focus-mode" : ""}" id="notes-layout" data-mobile-view="${notesView}">
       ${notesFoldersPaneHtml()}
       ${notesListPaneHtml(visibleNotes)}
       ${notesEditorPaneHtml()}
@@ -1648,14 +1654,17 @@ function renderNotesMobileBar() {
 
 function notesFoldersPaneHtml() {
   const allCount = notesData.notes.length;
+  const sidebarCollapsed = document.querySelector(".app-shell")?.classList.contains("sidebar-collapsed");
   const folderRows = notesData.folders.map(f => {
     const count = notesData.notes.filter(n => n.folderId === f.id).length;
+    const selected = folderDeleteMode && selectedFolderIdsForDelete.has(f.id);
     return `
       <li class="notes-folder-item">
-        <button class="notes-folder-row ${activeFolderId === f.id ? "active" : ""}" data-folder="${f.id}">
+        ${folderDeleteMode ? `<span class="notes-folder-select-dot ${selected ? "checked" : ""}"></span>` : ""}
+        <button class="notes-folder-row ${activeFolderId === f.id ? "active" : ""} ${selected ? "marked-for-delete" : ""}" data-folder="${f.id}">
           ${ICONS.folder}<span class="notes-folder-name">${escapeHtml(f.name)}</span><span class="notes-folder-count">${count}</span>
         </button>
-        <button class="notes-folder-delete" data-delete-folder="${f.id}" aria-label="Delete folder">✕</button>
+        ${!folderDeleteMode ? `<button class="notes-folder-delete" data-delete-folder="${f.id}" aria-label="Delete folder">✕</button>` : ""}
       </li>
     `;
   }).join("");
@@ -1664,7 +1673,11 @@ function notesFoldersPaneHtml() {
     <div class="notes-folders-pane">
       <div class="notes-pane-header">
         <h2 class="notes-pane-title">Notes</h2>
-        <button class="notes-icon-btn" id="notes-add-folder" aria-label="New folder">+</button>
+        <div class="notes-header-icons">
+          <button class="notes-icon-btn notes-desktop-only-btn" id="notes-sidebar-collapse-btn" aria-label="${sidebarCollapsed ? "Open sidebar" : "Collapse sidebar"}">${sidebarCollapsed ? ICONS.chevronRight : ICONS.chevronLeft}</button>
+          <button class="notes-icon-btn ${folderDeleteMode ? "notes-icon-btn-danger-active" : ""}" id="notes-folder-delete-toggle" aria-label="${folderDeleteMode ? "Delete selected folders" : "Select folders to delete"}">${ICONS.trash}</button>
+          <button class="notes-icon-btn" id="notes-add-folder" aria-label="New folder">+</button>
+        </div>
       </div>
       <div class="notes-search">
         ${ICONS.search}
@@ -1727,7 +1740,7 @@ function notesListPaneHtml(visibleNotes) {
       <div class="notes-pane-header">
         <button class="notes-back-btn" id="notes-back-to-folders" aria-label="Back">${ICONS.chevronLeft}</button>
         <h2 class="notes-pane-title">${escapeHtml(folderLabel)}</h2>
-        <span class="notes-topbar-spacer"></span>
+        <button class="notes-icon-btn notes-desktop-only-btn" id="notes-new-note-list" aria-label="New note">${ICONS.newNote}</button>
       </div>
 
       <div class="notes-mobile-topbar">
@@ -1752,8 +1765,10 @@ function notesEditorPaneHtml() {
     <div class="notes-editor-pane">
       <div class="notes-pane-header">
         <button class="notes-back-btn" id="notes-back-to-list" aria-label="Back">${ICONS.chevronLeft}</button>
-        <span class="notes-topbar-spacer"></span>
-        <button class="notes-icon-btn" id="notes-new-note" aria-label="New note">${ICONS.newNote}</button>
+        ${note ? `
+          <button class="notes-icon-btn notes-desktop-only-btn" id="notes-delete-note-desktop" aria-label="Delete note">${ICONS.trash}</button>
+          <button class="notes-icon-btn notes-desktop-only-btn ${notesFocusMode ? "notes-icon-btn-active" : ""}" id="notes-focus-toggle" aria-label="${notesFocusMode ? "Exit focus mode" : "Enter focus mode"}">${ICONS.expand}</button>
+        ` : `<span class="notes-topbar-spacer notes-desktop-only-btn"></span>`}
       </div>
 
       <div class="notes-mobile-topbar">
@@ -1863,9 +1878,32 @@ function handleAddFolder() {
   renderNotes();
 }
 
+// Toggles .focus-mode directly on the existing #notes-layout element rather
+// than going through renderNotes() — a full re-render replaces the
+// folders/list pane DOM nodes outright, which would cut off their own
+// collapse transition mid-flight instead of letting it animate.
+function setNotesFocusMode(on) {
+  notesFocusMode = on;
+  const layout = document.getElementById("notes-layout");
+  if (layout) layout.classList.toggle("focus-mode", on);
+  const btn = document.getElementById("notes-focus-toggle");
+  if (btn) {
+    btn.setAttribute("aria-label", on ? "Exit focus mode" : "Enter focus mode");
+    btn.classList.toggle("notes-icon-btn-active", on);
+  }
+}
+
 function attachNotesFolderEvents() {
   document.querySelectorAll(".notes-folder-row").forEach(btn => {
     btn.addEventListener("click", function () {
+      if (folderDeleteMode) {
+        const id = btn.dataset.folder;
+        if (id === "all") return; // "All Notes" is a virtual view, not a real folder — not selectable for deletion
+        if (selectedFolderIdsForDelete.has(id)) selectedFolderIdsForDelete.delete(id);
+        else selectedFolderIdsForDelete.add(id);
+        renderNotes();
+        return;
+      }
       activeFolderId = btn.dataset.folder === "all" ? null : btn.dataset.folder;
       notesView = "list";
       renderNotes();
@@ -1883,6 +1921,39 @@ function attachNotesFolderEvents() {
   });
 
   document.getElementById("notes-add-folder").addEventListener("click", handleAddFolder);
+
+  // Bulk folder-delete mode: first click arms it (icon turns red, folder
+  // rows become a select list instead of navigating); second click deletes
+  // whatever got selected and exits. Clicking with nothing selected just
+  // exits (a safe "cancel"), matching how most apps treat an empty selection.
+  document.getElementById("notes-folder-delete-toggle").addEventListener("click", function () {
+    if (!folderDeleteMode) {
+      folderDeleteMode = true;
+      selectedFolderIdsForDelete = new Set();
+      renderNotes();
+      return;
+    }
+    if (selectedFolderIdsForDelete.size > 0) {
+      const n = selectedFolderIdsForDelete.size;
+      if (!confirm(`Delete ${n} selected folder${n > 1 ? "s" : ""}? Their notes will move to All Notes.`)) return;
+      selectedFolderIdsForDelete.forEach(id => {
+        deleteFolder(id);
+        if (activeFolderId === id) activeFolderId = null;
+      });
+    }
+    folderDeleteMode = false;
+    selectedFolderIdsForDelete = new Set();
+    renderNotes();
+  });
+
+  // Doubles as the sidebar reopen control while on the Notes page — see the
+  // matching CSS comment on .sidebar-reopen-btn's Notes-page override for why
+  // the floating global reopen button is hidden here instead of relied on.
+  document.getElementById("notes-sidebar-collapse-btn").addEventListener("click", function () {
+    const collapsed = document.querySelector(".app-shell").classList.contains("sidebar-collapsed");
+    setSidebarCollapsed(!collapsed);
+    renderNotes();
+  });
 
   document.getElementById("notes-search-input").addEventListener("input", function (e) {
     notesSearchQuery = e.target.value;
@@ -2034,6 +2105,7 @@ function attachNotesListEvents() {
     notesView = "folders";
     renderNotes();
   });
+  document.getElementById("notes-new-note-list").addEventListener("click", handleCreateNote);
   attachNoteRowClickHandlers();
   attachNoteSwipeToDelete(document.querySelector(".notes-list-rows"));
 }
@@ -2047,7 +2119,6 @@ function attachNotesEditorEvents() {
     notesView = "list";
     renderNotes();
   });
-  document.getElementById("notes-new-note").addEventListener("click", handleCreateNote);
 
   const deleteBtn = document.getElementById("notes-delete-note-mobile");
   if (deleteBtn) {
@@ -2058,6 +2129,18 @@ function attachNotesEditorEvents() {
       renderNotes();
     });
   }
+
+  const deleteBtnDesktop = document.getElementById("notes-delete-note-desktop");
+  if (deleteBtnDesktop) {
+    deleteBtnDesktop.addEventListener("click", function () {
+      if (!confirm("Delete this note? This can't be undone.")) return;
+      deleteNote(activeNoteId);
+      renderNotes();
+    });
+  }
+
+  const focusToggleBtn = document.getElementById("notes-focus-toggle");
+  if (focusToggleBtn) focusToggleBtn.addEventListener("click", () => setNotesFocusMode(!notesFocusMode));
 
   const titleInput = document.getElementById("note-title-input");
   const body = document.getElementById("note-body");
