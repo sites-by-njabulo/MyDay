@@ -17,7 +17,7 @@ on:
     - cron: '7 8 * * *'   # 10:00 AM SAST - Bible verse
     - cron: '7 9 * * *'   # 11:00 AM SAST - Set to-do list
     - cron: '7 13 * * *'  # 3:00 PM SAST  - Motivational quote
-    - cron: '7 11 * * *'  # 1:00 PM SAST  - Prayer
+    - cron: '7 10 * * *'  # 12:00 PM SAST - Prayer
     - cron: '7 15 * * *'  # 5:00 PM SAST  - Prayer
     - cron: '7 18 * * *'  # 8:00 PM SAST  - Prayer
     - cron: '7 16 * * *'  # 6:00 PM SAST  - Workout (placeholder, edit to your time)
@@ -72,8 +72,8 @@ jobs:
               "contents": {"en": "✨ Today'\''s motivational quote is ready"}
             }'
 
-      - name: Prayer reminder (1PM)
-        if: github.event.schedule == '7 11 * * *' || github.event.inputs.which == 'prayer'
+      - name: Prayer reminder (12PM)
+        if: github.event.schedule == '7 10 * * *' || github.event.inputs.which == 'prayer'
         run: |
           curl -sf -X POST https://api.onesignal.com/notifications \
             -H "Content-Type: application/json" \

@@ -33,7 +33,7 @@ Font: Inter, used everywhere including the Bible verse callout (no serif). Icons
   "schemaVersion": 1,
   "days": {
     "YYYY-MM-DD": {
-      "faith": { "prayerCount": 0, "bibleReadingDone": false },
+      "faith": { "prayerTimes": { "noon": false, "evening": false, "night": false }, "bibleReadingDone": false },
       "workout": { "pushups": {"count":0,"goal":200}, "curls": {"count":0,"goal":100} }
     }
   },
@@ -46,7 +46,7 @@ Font: Inter, used everywhere including the Bible verse callout (no serif). Icons
 
 - `days["YYYY-MM-DD"]` is created lazily by `ensureDayRecord()` — the entire daily-reset mechanism for faith/workout, no cron needed client-side.
 - `todos` is a flat, root-level array (not nested per day). Each item carries its own `date`. The To-Do page buckets `date <= today` into "Today" (this also surfaces overdue, undone tasks) and `date > today` into "Upcoming". The Calendar page reads this same array to show dots and the day-detail panel.
-- `faith.prayerCount` is an incrementing counter (tap to log each prayer), not a boolean — prayer happens multiple times a day. `bibleReadingDone` stays a simple boolean.
+- `faith.prayerTimes` is 3 fixed checkboxes (`noon`/`evening`/`night` = 12PM/5PM/8PM), not a counter — check one when you pray at that time. `bibleReadingDone` stays a simple boolean. Both reset at midnight via `ensureDayRecord()`/`armMidnightWatcher()`, same as workout counts.
 - `todos[].description`/`priority`/`time` are optional (older saved todos simply lack them, read safely as falsy). `priority` is `null|"low"|"med"|"high"`, shown as a colored dot on the task row. `time` is `"HH:MM"|null`. `armMidnightWatcher()` (region 4) re-renders the active section right after local midnight so faith/workout counters visibly reset even if the app was left open straight through it — `ensureDayRecord()` alone only resets lazily, on the next render.
 
 ## localStorage shape (`myday_notes`) — separate key, never touched by the daily reset
@@ -62,7 +62,7 @@ Font: Inter, used everywhere including the Bible verse callout (no serif). Icons
 - `folderId: null` means unfiled — visible only under "All Notes". Deleting a folder un-files its notes rather than deleting them.
 - `bodyHtml` is the note editor's raw `contenteditable` `innerHTML` (formatted via `document.execCommand` for bold/italic/underline/strike/headings/lists; checklists are a hand-inserted `<ul class="note-checklist">`). This is a deliberate simplification, not a structured document model.
 - Desktop renders all 3 Notes panes (folders/list/editor) at once; mobile drill-down (`notesView`: `"folders"|"list"|"editor"`) shows one at a time via `.notes-layout[data-mobile-view]` in `styles.css`, same DOM either way.
-- `migrateState()` in `app.js` (region 2) upgrades older saved data on load: flattens any old nested `day.todos` into the root `todos` array, and converts old `faith.prayerDone` booleans into `prayerCount` (0 or 1). Safe to run repeatedly; only touches days that still have the old shape.
+- `migrateState()` in `app.js` (region 2) upgrades older saved data on load: flattens any old nested `day.todos` into the root `todos` array, and walks old `faith.prayerDone` (boolean) → `prayerCount` (number) → `prayerTimes` (3 checkboxes) shapes forward to the current one. Safe to run repeatedly; only touches days that still have an old shape. Note the old counter can't tell you *which* times were prayed, so migrating a counter-shaped day starts all 3 checkboxes unchecked rather than guessing.
 - `getChallengeStats()` (region 10) is the single source of truth for days-remaining/total-earned/progress — used by both the read-only Home summary card and the full Challenge page so they never drift out of sync.
 
 ## Notification setup checklist (one-time, manual)
@@ -83,7 +83,7 @@ Reminder schedule (Africa/Johannesburg, UTC+2, no DST):
 | Bible verse | 10:00 AM | `7 8 * * *` |
 | Set to-do list | 11:00 AM | `7 9 * * *` |
 | Motivational quote | 3:00 PM | `7 13 * * *` |
-| Prayer | 1:00 PM, 5:00 PM, 8:00 PM | `7 11 * * *`, `7 15 * * *`, `7 18 * * *` |
+| Prayer | 12:00 PM, 5:00 PM, 8:00 PM | `7 10 * * *`, `7 15 * * *`, `7 18 * * *` |
 | Workout (placeholder, edit to your time) | 6:00 PM | `7 16 * * *` |
 
 **To change a reminder time:** edit the matching cron line in `.github/workflows/reminders.yml` and commit. The in-app Settings page only has a workout-time picker now (local-display-only, does not update this file automatically) — prayer no longer has an in-app picker since it fires 3 fixed times a day, set directly in the workflow file.

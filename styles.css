@@ -1221,44 +1221,40 @@ button, input { font-family: inherit; }
 .faith-card:hover { border-color: var(--accent); }
 .faith-card.done { border-color: var(--accent); background: var(--accent-soft); animation: pop 0.3s var(--ease-out); }
 
-.faith-tap {
-  all: unset;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  cursor: pointer;
-}
-.faith-tap:active { transform: scale(0.97); }
-.faith-undo {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--input-bg);
-  color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: border-color 0.15s var(--ease-out-quart), color 0.15s var(--ease-out-quart);
-}
-.faith-undo:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.faith-undo:disabled { opacity: 0.35; cursor: default; }
 .faith-icon { color: var(--text-secondary); }
 .faith-icon svg { width: 30px; height: 30px; }
 .faith-card.done .faith-icon { color: var(--accent); }
 .faith-label { font-size: 15px; font-weight: 700; color: var(--text-primary); }
-.faith-count { font-size: 28px; font-weight: 800; color: var(--text-primary); line-height: 1; }
-.faith-card.done .faith-count { color: var(--accent); }
 .faith-status { font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
 .faith-card.done .faith-status { color: var(--accent); }
+
+/* Prayer card isn't a single tappable card anymore — it holds 3 independent
+   time checkboxes, so it drops the whole-card cursor/press affordance. */
+.prayer-card { cursor: default; align-items: stretch; gap: 12px; padding: 20px 16px; }
+.prayer-card:active { transform: none; }
+.prayer-card-head { display: flex; align-items: center; gap: 8px; }
+.prayer-card-head .faith-icon svg { width: 22px; height: 22px; }
+.prayer-time-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; width: 100%; }
+.prayer-time-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.prayer-time-label { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+.prayer-checkbox {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--hairline-strong);
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out-quart), border-color 0.15s var(--ease-out-quart);
+}
+.prayer-checkbox:hover { border-color: var(--accent); }
+.prayer-checkbox.checked { background: var(--accent); border-color: var(--accent); animation: pop 0.3s var(--ease-out); }
 
 @media (min-width: 769px) {
   .faith-grid { grid-template-columns: 1fr 1fr; max-width: 480px; }

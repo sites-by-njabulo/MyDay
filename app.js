@@ -62,7 +62,7 @@ function defaultState() {
 
 // Migrates older saved data to the current shape:
 // - day.todos (nested per-day) -> flat state.todos with a date field
-// - day.faith.prayerDone (boolean) -> day.faith.prayerCount (number)
+// - day.faith.prayerDone (boolean) -> day.faith.prayerCount (number) -> day.faith.prayerTimes (3 checkboxes)
 function migrateState(s) {
   Object.keys(s.days || {}).forEach(dateKey => {
     const day = s.days[dateKey];
@@ -70,9 +70,15 @@ function migrateState(s) {
       day.todos.forEach(t => s.todos.push({ id: t.id, text: t.text, done: t.done, date: dateKey }));
       delete day.todos;
     }
-    if (day.faith && typeof day.faith.prayerCount === "undefined") {
+    if (day.faith && typeof day.faith.prayerCount === "undefined" && typeof day.faith.prayerTimes === "undefined") {
       day.faith.prayerCount = day.faith.prayerDone ? 1 : 0;
       delete day.faith.prayerDone;
+    }
+    if (day.faith && typeof day.faith.prayerTimes === "undefined") {
+      // No way to know which specific times were prayed under the old counter
+      // model, so this starts unchecked rather than guessing.
+      day.faith.prayerTimes = { noon: false, evening: false, night: false };
+      delete day.faith.prayerCount;
     }
   });
   if (typeof s.settings.theme === "undefined") s.settings.theme = "dark";
@@ -118,7 +124,7 @@ function getTodayKey() {
 function ensureDayRecord(dateKey) {
   if (!state.days[dateKey]) {
     state.days[dateKey] = {
-      faith: { prayerCount: 0, bibleReadingDone: false },
+      faith: { prayerTimes: { noon: false, evening: false, night: false }, bibleReadingDone: false },
       workout: {
         pushups: { count: 0, goal: DEFAULT_GOALS.pushups },
         curls: { count: 0, goal: DEFAULT_GOALS.curls }
@@ -359,10 +365,10 @@ function renderHomeToday() {
           <span class="overview-label">To-Dos</span>
           <span class="overview-value">${todosDone}/${todosTotal}</span>
         </div>
-        <div class="overview-chip ${day.faith.prayerCount > 0 ? "done" : ""}">
+        <div class="overview-chip ${PRAYER_TIMES.every(p => day.faith.prayerTimes[p.key]) ? "done" : ""}">
           <span class="overview-icon">${ICONS.heart}</span>
           <span class="overview-label">Prayer</span>
-          <span class="overview-value">${day.faith.prayerCount}×</span>
+          <span class="overview-value">${PRAYER_TIMES.filter(p => day.faith.prayerTimes[p.key]).length}/${PRAYER_TIMES.length}</span>
         </div>
         <div class="overview-chip ${day.faith.bibleReadingDone ? "done" : ""}">
           <span class="overview-icon">${ICONS.book}</span>
@@ -817,8 +823,15 @@ function escapeHtml(str) {
 /* ==========================================================
    8. FAITH
    ========================================================== */
+const PRAYER_TIMES = [
+  { key: "noon", label: "12:00 PM" },
+  { key: "evening", label: "5:00 PM" },
+  { key: "night", label: "8:00 PM" }
+];
+
 function renderFaith() {
   const day = ensureDayRecord(getTodayKey());
+  const allPrayed = PRAYER_TIMES.every(p => day.faith.prayerTimes[p.key]);
 
   document.getElementById("page-faith").innerHTML = `
     <div class="page-header">
@@ -827,14 +840,19 @@ function renderFaith() {
     </div>
 
     <div class="faith-grid">
-      <div class="faith-card prayer-card ${day.faith.prayerCount > 0 ? "done" : ""}">
-        <button class="faith-undo" id="prayer-undo" aria-label="Undo last prayer log" ${day.faith.prayerCount === 0 ? "disabled" : ""}>−</button>
-        <button class="faith-tap" id="prayer-card">
+      <div class="faith-card prayer-card ${allPrayed ? "done" : ""}">
+        <div class="prayer-card-head">
           <span class="faith-icon">${ICONS.heart}</span>
           <span class="faith-label">Prayer</span>
-          <span class="faith-count">${day.faith.prayerCount}</span>
-          <span class="faith-status">Tap to log a prayer</span>
-        </button>
+        </div>
+        <ul class="prayer-time-list">
+          ${PRAYER_TIMES.map(p => `
+            <li class="prayer-time-row">
+              <span class="prayer-time-label">${p.label}</span>
+              <button class="prayer-checkbox ${day.faith.prayerTimes[p.key] ? "checked" : ""}" data-time="${p.key}" aria-label="${p.label} prayer">${day.faith.prayerTimes[p.key] ? "✓" : ""}</button>
+            </li>
+          `).join("")}
+        </ul>
       </div>
       <button class="faith-card ${day.faith.bibleReadingDone ? "done" : ""}" id="bible-card">
         <span class="faith-icon">${ICONS.book}</span>
@@ -844,17 +862,13 @@ function renderFaith() {
     </div>
   `;
 
-  document.getElementById("prayer-card").addEventListener("click", function () {
-    day.faith.prayerCount += 1;
-    saveState();
-    renderFaith();
-  });
-
-  document.getElementById("prayer-undo").addEventListener("click", function () {
-    if (day.faith.prayerCount === 0) return;
-    day.faith.prayerCount -= 1;
-    saveState();
-    renderFaith();
+  document.querySelectorAll(".prayer-checkbox").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const key = btn.dataset.time;
+      day.faith.prayerTimes[key] = !day.faith.prayerTimes[key];
+      saveState();
+      renderFaith();
+    });
   });
 
   document.getElementById("bible-card").addEventListener("click", function () {
