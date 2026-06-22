@@ -10,7 +10,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <!--
   OneSignal Web Push SDK.
@@ -100,9 +100,13 @@
         <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg></span>
         <span class="nav-label">Challenge</span>
       </button>
-      <button class="nav-item" data-section="notes">
+      <button class="nav-item nav-item-desktop-only" data-section="notes">
         <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
         <span class="nav-label">Notes</span>
+      </button>
+      <button class="nav-item" data-section="gameplan">
+        <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v17"/><path d="M5 4.5c2-1.2 4-1.2 6 0s4 1.2 6 0v9c-2 1.2-4 1.2-6 0s-4-1.2-6 0z"/></svg></span>
+        <span class="nav-label">Game Plan</span>
       </button>
       <button class="nav-item" data-section="you">
         <span class="nav-icon nav-avatar">N</span>
@@ -117,6 +121,7 @@
       <section class="page" id="page-workout" data-page="workout"></section>
       <section class="page" id="page-video" data-page="video"></section>
       <section class="page" id="page-notes" data-page="notes"></section>
+      <section class="page" id="page-gameplan" data-page="gameplan"></section>
       <section class="page" id="page-you" data-page="you"></section>
       <section class="page" id="page-settings" data-page="settings"></section>
     </main>

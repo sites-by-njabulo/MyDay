@@ -35,6 +35,37 @@ const CHALLENGE_DURATION_DAYS = 60;
 // Shown on the You page header and used for the nav avatar initial.
 const USER_NAME = "Njabulo";
 
+// Single source of truth for the 5 priorities — read by both the full Game
+// Plan page and the Home page's compact summary card, so the two can never
+// drift out of sync with each other.
+const GAME_PLAN = [
+  {
+    title: "Priority 1 — Short Form Content",
+    short: "4+ short videos/day (2 web design + 2 personal), US targeted",
+    body: "Post more than 2 times per day on your web design account and more than 2 times per day on your personal account. That is a minimum of 4 pieces of short form content every single day. Every single post must have United States set as the target location — this is non negotiable. Web design account covers web design and marketing. Personal account covers your journey, faith, motivation and entrepreneurship."
+  },
+  {
+    title: "Priority 2 — Long Form Content",
+    short: "2+ YouTube videos/week, no exceptions",
+    body: "Minimum 2 YouTube videos per week. No exceptions."
+  },
+  {
+    title: "Priority 3 — Cold DMs",
+    short: "30 Instagram DMs/day — exactly 30, every day",
+    body: "30 DMs per day on Instagram. Keep it at exactly 30 — do not go higher to avoid getting flagged for spam. Consistent every single day."
+  },
+  {
+    title: "Priority 4 — Sales and Communication",
+    short: "1 hour/day learning sales + networking on IG/Discord",
+    body: "1 hour per day learning sales and communication. Also actively connect with new people on Instagram and Discord — networking builds communication skills and opens doors. Do not skip this."
+  },
+  {
+    title: "Priority 5 — Read 5 Pages Daily",
+    short: "Read 5 pages of your book, every day",
+    body: "Read 5 pages from your book every day. It builds video ideas, sharpens communication, and strengthens your faith in Jesus Christ."
+  }
+];
+
 // Inline SVG icons (replace emoji throughout the UI).
 const ICONS = {
   check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12.5l2.5 2.5L16 9"/></svg>`,
@@ -463,6 +494,7 @@ function renderSection(name) {
     case "workout": renderWorkout(); break;
     case "video": renderVideoPlan(); break;
     case "notes": renderNotes(); break;
+    case "gameplan": renderGamePlan(); break;
     case "you": renderYou(); break;
     case "settings": renderSettings(); break;
   }
@@ -530,6 +562,7 @@ function renderHomeToday() {
     </div>
 
     <div class="quote-card">
+      <p class="eyebrow quote-eyebrow">Quote of the day</p>
       <p class="quote-text">${quote.text}</p>
       ${quote.author ? `<p class="quote-author">— ${quote.author}</p>` : ""}
     </div>
@@ -565,6 +598,16 @@ function renderHomeToday() {
       </div>
     </div>
 
+    <div class="gameplan-summary-card">
+      <div class="gameplan-summary-head">
+        <h2 class="section-heading">Game Plan</h2>
+        <button class="gameplan-summary-link" id="gameplan-summary-link">View all</button>
+      </div>
+      <ul class="gameplan-summary-list">
+        ${GAME_PLAN.map(p => `<li>${escapeHtml(p.short)}</li>`).join("")}
+      </ul>
+    </div>
+
     <div class="challenge-summary-card">
       <div class="challenge-summary-head">
         <span class="challenge-summary-title">$10K Challenge</span>
@@ -586,6 +629,7 @@ function renderHomeToday() {
     </div>
   `;
 
+  document.getElementById("gameplan-summary-link").addEventListener("click", () => showSection("gameplan"));
   animateRings(document.getElementById("home-tab-content"));
 }
 
@@ -1397,6 +1441,7 @@ function renderYou() {
       <button class="you-tile" data-action="video">${ICONS.video}<span>Videos</span></button>
       <button class="you-tile" data-action="calendar">${ICONS.calendar}<span>Calendar</span></button>
       <button class="you-tile" data-action="challenge">${ICONS.target}<span>Challenge</span></button>
+      <button class="you-tile" data-action="notes">${ICONS.notes}<span>Notes</span></button>
     </div>
 
     <div class="you-stat-card">
@@ -1428,11 +1473,33 @@ function renderYou() {
       } else if (action === "challenge") {
         homeTab = "challenge";
         showSection("home");
+      } else if (action === "notes") {
+        showSection("notes");
       }
     });
   });
 
   animateRings(document.getElementById("page-you"));
+}
+
+/* ==========================================================
+   12.5. GAME PLAN
+   ========================================================== */
+function renderGamePlan() {
+  document.getElementById("page-gameplan").innerHTML = `
+    <p class="eyebrow">Game Plan</p>
+    <h1 class="gameplan-title">GAME PLAN</h1>
+    <p class="gameplan-intro">This is your north star. When you feel lost or don't know what to do — come here.</p>
+
+    <div class="gameplan-list">
+      ${GAME_PLAN.map(p => `
+        <div class="gameplan-card">
+          <h2 class="gameplan-card-title">${escapeHtml(p.title)}</h2>
+          <p class="gameplan-card-body">${escapeHtml(p.body)}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
 }
 
 /* ==========================================================

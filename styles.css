@@ -22,7 +22,7 @@
   --surface-3: #18191a;
 
   --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-verse: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-verse: 'Lora', Georgia, 'Times New Roman', serif;
 
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -747,6 +747,58 @@ button, input { font-family: inherit; }
 .challenge-summary-value { font-size: 19px; font-weight: 800; color: var(--text-primary); }
 .challenge-summary-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 2px; }
 
+/* Compact read-only Game Plan reminder on Home — a daily nudge, not the
+   full page (see .gameplan-* below for that). */
+.gameplan-summary-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+.gameplan-summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.gameplan-summary-head .section-heading { margin: 0; }
+.gameplan-summary-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+}
+.gameplan-summary-link:hover { color: var(--accent-hover); }
+.gameplan-summary-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gameplan-summary-list li {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+.gameplan-summary-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 .verse-card {
   position: relative;
   background: var(--card-bg);
@@ -766,7 +818,7 @@ button, input { font-family: inherit; }
 .verse-text {
   margin: 0;
   font-family: var(--font-verse);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 500;
   line-height: 1.5;
   letter-spacing: var(--tracking-display);
@@ -776,10 +828,11 @@ button, input { font-family: inherit; }
 .quote-card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 18px 20px;
-  margin-bottom: 26px;
+  border-radius: var(--radius-lg);
+  padding: 24px 24px 26px;
+  margin-bottom: 16px;
 }
+.quote-eyebrow { color: var(--text-secondary); margin-bottom: 8px; }
 .quote-text {
   margin: 0 0 6px;
   font-size: 14.5px;
@@ -2434,6 +2487,41 @@ button, input { font-family: inherit; }
   font-size: 12px;
 }
 
+/* ===== Game Plan ===== */
+.gameplan-title {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: var(--tracking-display);
+  color: var(--text-primary);
+}
+.gameplan-intro {
+  margin: 0 0 24px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 56ch;
+}
+.gameplan-list { display: flex; flex-direction: column; gap: 14px; }
+.gameplan-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+}
+.gameplan-card-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.gameplan-card-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
 /* ===== You page ===== */
 .you-header { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .you-gear {
@@ -2465,7 +2553,7 @@ button, input { font-family: inherit; }
   flex: none;
 }
 
-.you-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+.you-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
 .you-tile {
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   background: var(--card-bg);
