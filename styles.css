@@ -437,6 +437,13 @@ button, input { font-family: inherit; }
 
 /* ===== Desktop: sidebar nav ===== */
 @media (min-width: 769px) {
+  /* Tracks the sidebar's ACTUAL current width (248px open, 0 collapsed) as
+     a variable other independent calc()s can read — e.g. Notes' own focus-
+     mode math below, which needs to know how much real space the app
+     sidebar is occupying right now, not just assume it's always open. */
+  .app-shell { --effective-nav-w: var(--nav-w); }
+  .app-shell.sidebar-collapsed { --effective-nav-w: 0px; }
+
   #main-nav {
     position: fixed;
     top: 0;
@@ -527,20 +534,39 @@ button, input { font-family: inherit; }
      itself, so #main-content can stay full-width while the column inside it
      is free to center independently. #page-notes is excluded: its 3-pane
      layout intentionally fills the full width.
-     Left-aligned (margin-left:0) by default, matching the original layout
-     while the sidebar is open — centering both columns at once (sidebar +
-     centered content) read as visually busy/hard to focus on. Centering
-     only kicks in once the sidebar is collapsed (override just below), when
-     there's no second column competing for attention and a full-width flush
-     -left block would otherwise look unbalanced. */
+     Always margin:auto (always mathematically centered in #main-content) —
+     the "left-aligned while the sidebar is open" look comes from a
+     translateX shift below, not from toggling margin-left between 0 and
+     auto. margin-left:auto can't be transitioned (it's a keyword, not a
+     length) — toggling it directly snapped the content to its final
+     position rather than animating, and since that snap happened on
+     #main-content's OWN box (which is simultaneously resizing as the
+     sidebar collapses), the content visibly tracked the sidebar's edge
+     first and only "popped" to centered after — exactly the bug being
+     fixed here. transform is a length-based, GPU-composited property that
+     animates smoothly on its own, independent of whatever #main-content/
+     #main-nav are doing at the same time, which is what makes this go
+     straight to its final centered position instead of following the
+     sidebar there first.
+     --page-mw holds each page's own max-width (defaulted here, overridden
+     for the wider calendar-day-panel case below) so the shift math and the
+     max-width itself can never drift out of sync. */
   .page:not(#page-notes) {
-    max-width: 760px;
-    margin-left: 0;
-    margin-right: auto;
-    transition: margin-left 0.25s var(--ease-out-quart), margin-right 0.25s var(--ease-out-quart);
+    --page-mw: 760px;
+    max-width: var(--page-mw);
+    margin: 0 auto;
+    /* With the sidebar open, shift the (already-centered-in-#main-content)
+       box left by exactly its own auto-margin amount, landing it back at
+       the original flush-left position — expressed purely in terms of
+       viewport width + fixed constants (nav width, this page's own
+       max-width, #main-content's 80px combined side padding), never in
+       terms of #main-content's own current/mid-transition width, so this
+       transition runs entirely independently of the sidebar's. */
+    transform: translateX(calc((var(--nav-w) + var(--page-mw) + 80px) / 2 - 50vw));
+    transition: transform 0.32s var(--ease-out-quart);
   }
   .app-shell.sidebar-collapsed .page:not(#page-notes) {
-    margin-left: auto;
+    transform: translateX(0);
   }
   /* Reserve exactly the panel's width (280px) + gap (16px) as EXTRA room, so
      opening the day-detail panel never shrinks the calendar's own grown
@@ -550,16 +576,21 @@ button, input { font-family: inherit; }
      its innerHTML just by navigating away (showSection() only toggles
      display:none), so matching from a shared ancestor would have kept this
      widened forever after the first time a calendar day was ever selected. */
-  #page-todo.active:has(.cal-panel) { max-width: calc(760px + 280px + 16px); }
+  /* Sets --page-mw rather than max-width directly so the translateX shift
+     above (which reads --page-mw) stays correct for this wider case too. */
+  #page-todo.active:has(.cal-panel) { --page-mw: calc(760px + 280px + 16px); }
 
   /* Collapsible sidebar. Width+padding (not transform/visibility) so the
      transition genuinely shrinks the box — overflow:hidden on #main-nav
      clips its content as it shrinks instead of wrapping/reflowing it. */
   #main-nav {
     overflow: hidden;
-    transition: width 0.25s var(--ease-out-quart), padding 0.25s var(--ease-out-quart), border-right-width 0.25s var(--ease-out-quart);
+    /* Same 0.32s duration as #main-content's margin-left and .page's
+       transform below — all three are part of one coordinated sidebar-
+       collapse motion and need to move in lockstep, not drift apart. */
+    transition: width 0.32s var(--ease-out-quart), padding 0.32s var(--ease-out-quart), border-right-width 0.32s var(--ease-out-quart);
   }
-  #main-content { transition: margin-left 0.25s var(--ease-out-quart); }
+  #main-content { transition: margin-left 0.32s var(--ease-out-quart); }
   .app-shell.sidebar-collapsed #main-nav {
     width: 0;
     padding-left: 0;
@@ -2207,7 +2238,28 @@ button, input { font-family: inherit; }
   .notes-swipe-delete-bg { display: none; }
 
   .notes-editor-pane .notes-pane-header { flex: none; padding: 16px 24px 0; margin-bottom: 0; }
-  .notes-editor-pane .note-title-input { flex: none; margin: 16px 24px 10px; width: auto; }
+  /* Width and margin-left below are expressed purely in terms of viewport
+     width + fixed constants (sidebar width, the folders+list panes' 540px,
+     this column's own 700px focus-mode cap) — NEVER as a percentage of the
+     editor pane's own current width. That distinction matters because the
+     editor pane is ITSELF resizing throughout this same transition (the
+     folders/list panes are simultaneously animating toward 0 — see further
+     down). An earlier version of this rule used width:calc(100% - 48px) +
+     margin:auto + a transitioning max-width, which is what the live specs
+     site testing actually exposed as broken: width tracked the (growing)
+     parent early on while max-width was still non-binding, peaked above
+     even the FINAL focus-mode width, then shrank back down once max-width
+     caught up and started binding — a real, measured overshoot/bounce, not
+     just a theoretical concern. Computing both ends directly from vw makes
+     this transition entirely independent of whatever the sibling panes are
+     doing at that exact moment, the same fix already proven for the
+     sidebar-collapse/page-centering bug above. */
+  .notes-editor-pane .note-title-input {
+    flex: none;
+    width: calc(100vw - var(--effective-nav-w) - 588px);
+    margin: 16px 0 10px 24px;
+    transition: width 0.32s var(--ease-out-quart), margin-left 0.32s var(--ease-out-quart);
+  }
   .notes-editor-pane .note-toolbar {
     display: flex;
     flex: none;
@@ -2224,13 +2276,23 @@ button, input { font-family: inherit; }
        width change, since there wasn't a width bug to begin with. */
     border-bottom: 1px solid var(--border);
     border-radius: 0;
+    width: calc(100vw - var(--effective-nav-w) - 588px);
     padding: 0 0 14px;
-    margin: 0 24px 14px;
+    margin: 0 0 14px 24px;
     gap: 8px;
+    transition: width 0.32s var(--ease-out-quart), margin-left 0.32s var(--ease-out-quart);
   }
   .note-toolbar-row { overflow-x: visible; }
   .note-toolbar-divider { width: auto; height: 1px; margin: 0; }
-  .note-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 24px 40px; }
+  .note-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 24px 40px;
+    width: calc(100vw - var(--effective-nav-w) - 540px);
+    margin-left: 0;
+    transition: width 0.32s var(--ease-out-quart), margin-left 0.32s var(--ease-out-quart);
+  }
   .notes-editor-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; padding: 0; }
 
   .notes-back-btn { display: none; }
@@ -2245,7 +2307,7 @@ button, input { font-family: inherit; }
      two states live on different elements (.app-shell vs #notes-layout)
      and never reference each other. */
   .notes-folders-pane, .notes-list-pane {
-    transition: flex-basis 0.3s var(--ease-out-quart), padding 0.3s var(--ease-out-quart), border-right-width 0.3s var(--ease-out-quart);
+    transition: flex-basis 0.32s var(--ease-out-quart), padding 0.32s var(--ease-out-quart), border-right-width 0.32s var(--ease-out-quart);
   }
   .notes-layout.focus-mode .notes-folders-pane,
   .notes-layout.focus-mode .notes-list-pane {
@@ -2255,18 +2317,15 @@ button, input { font-family: inherit; }
     border-right-width: 0;
     overflow: hidden;
   }
-  .notes-layout.focus-mode .notes-editor-pane .note-title-input {
-    max-width: 700px;
-    width: 100%;
-    margin: 16px auto 10px;
-  }
-  .notes-layout.focus-mode .notes-editor-pane .note-toolbar {
-    max-width: 700px;
-    margin: 0 auto 14px;
-  }
+  /* Both ends (this override and the base rules above) are plain vw-based
+     calc()s, so width and margin-left both transition as ordinary lengths
+     — see the comment on .note-title-input above for why that's what
+     keeps this from overshooting. */
+  .notes-layout.focus-mode .notes-editor-pane .note-title-input,
+  .notes-layout.focus-mode .notes-editor-pane .note-toolbar,
   .notes-layout.focus-mode .notes-editor-pane .note-body {
-    max-width: 700px;
-    margin: 0 auto;
+    width: 700px;
+    margin-left: calc((100vw - var(--effective-nav-w) - 700px) / 2);
   }
 }
 
