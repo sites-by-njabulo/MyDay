@@ -66,6 +66,21 @@ const GAME_PLAN = [
   }
 ];
 
+// The two accounts content gets planned for, and the 5 video formats —
+// shared between the day-editor controls and the read-only chip labels on
+// each collapsed day card, so a format/account's label only lives in one place.
+const CONTENT_ACCOUNTS = [
+  { id: "personal", label: "Personal" },
+  { id: "webdesign", label: "Web Design" }
+];
+const CONTENT_FORMATS = [
+  { id: "yapping", label: "Yapping video", desc: "On camera talking about business, mindset, or entrepreneurship — sometimes educational, sometimes motivational." },
+  { id: "educational", label: "Educational video", desc: "At your desk teaching something specific — SEO, websites, or online marketing." },
+  { id: "before-after-website", label: "Before & After — website only", desc: "Laptop screen recording of a website transformation with music playing over it. No talking." },
+  { id: "before-after-oncamera", label: "Before & After — on camera", desc: "On camera, showing and explaining a website transformation." },
+  { id: "comment-audit", label: "Comment reply audit", desc: "Reply to a business owner's comment and audit their website/online presence live on camera." }
+];
+
 // Inline SVG icons (replace emoji throughout the UI).
 const ICONS = {
   check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12.5l2.5 2.5L16 9"/></svg>`,
@@ -81,6 +96,7 @@ const ICONS = {
   target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.8" fill="currentColor" stroke="none"/></svg>`,
   chevronLeft: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>`,
   chevronRight: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>`,
+  chevronDown: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`,
   trash: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V4.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1V7"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
   expand: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5"/><path d="M15 4h5v5"/><path d="M9 20H4v-5"/><path d="M15 20h5v-5"/></svg>`,
   flag: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3.5v17"/><path d="M5 4.5c2-1.2 4-1.2 6 0s4 1.2 6 0v9c-2 1.2-4 1.2-6 0s-4-1.2-6 0z"/></svg>`,
@@ -105,7 +121,11 @@ function defaultState() {
     todos: [],
     videoPlan: [],
     challenge: { startDate: null, targetAmount: CHALLENGE_TARGET, durationDays: CHALLENGE_DURATION_DAYS, entries: [] },
-    settings: { prayerReminderTime: "07:00", workoutReminderTime: "18:00", theme: "dark" }
+    settings: { prayerReminderTime: "07:00", workoutReminderTime: "18:00", theme: "dark" },
+    // Flat date-keyed map, same convention as `days` — but never touched by
+    // ensureDayRecord()/the midnight reset, since planned content for a
+    // future or past day must never be wiped just because a day changed.
+    contentCalendar: {}
   };
 }
 
@@ -461,6 +481,10 @@ function showSection(name) {
   currentSectionName = name;
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("active", p.dataset.page === name));
   let navTarget = (name === "settings" || name === "video") ? "you" : name;
+  // Game Plan no longer has its own nav item (only reachable via the Home
+  // page's tab bar / summary card now) — highlight Home instead of leaving
+  // every nav item unhighlighted while on it.
+  if (name === "gameplan") navTarget = "home";
   if (name === "home" && homeTab === "challenge") navTarget = "challenge";
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.section === navTarget));
   // The Add Task FAB (and its voice-input companion button) belong only to
@@ -495,6 +519,7 @@ function renderSection(name) {
     case "video": renderVideoPlan(); break;
     case "notes": renderNotes(); break;
     case "gameplan": renderGamePlan(); break;
+    case "content": renderContentCalendar(); break;
     case "you": renderYou(); break;
     case "settings": renderSettings(); break;
   }
@@ -506,8 +531,21 @@ function renderSection(name) {
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
+// Anchor date for the 30-day verse/quote rotation — index 0 falls on this
+// date, advancing by 1 each calendar day and wrapping at 30. The previous
+// version derived the index directly from date.getDate()-1, which silently
+// re-locked the rotation to the SAME verse/quote on the 1st of every month,
+// the 2nd of every month, etc. (calendar position within a month, not a
+// true rolling 30-day cycle) rather than ever genuinely cycling through all
+// 30 entries continuously. Moving the anchor here is also how to
+// deliberately restart the rotation at day 1 — set it to today's date.
+const VERSE_QUOTE_CYCLE_START = "2026-06-25";
+
 function cycleIndex() {
-  return (new Date().getDate() - 1) % 30;
+  const start = new Date(VERSE_QUOTE_CYCLE_START + "T00:00:00");
+  const today = new Date(getTodayKey() + "T00:00:00");
+  const daysSince = Math.round((today - start) / 86400000);
+  return ((daysSince % 30) + 30) % 30;
 }
 
 let homeTab = "today"; // "today" | "challenge"
@@ -517,12 +555,20 @@ function renderHome() {
     <div class="home-tabbar">
       <button class="home-tab ${homeTab === "today" ? "active" : ""}" data-tab="today">Today</button>
       <button class="home-tab ${homeTab === "challenge" ? "active" : ""}" data-tab="challenge">Challenge</button>
+      <button class="home-tab" data-tab="gameplan">Game Plan</button>
     </div>
     <div id="home-tab-content"></div>
   `;
 
   document.querySelectorAll(".home-tab").forEach(btn => {
     btn.addEventListener("click", function () {
+      // Game Plan is a real, separate page (not Home sub-content like
+      // Today/Challenge) — this tab is just another entry point into it,
+      // so it navigates away outright rather than ever setting homeTab.
+      if (btn.dataset.tab === "gameplan") {
+        showSection("gameplan");
+        return;
+      }
       homeTab = btn.dataset.tab;
       renderHome();
       // Keep the desktop sidebar's Challenge shortcut in sync with the in-page
@@ -1500,6 +1546,156 @@ function renderGamePlan() {
       `).join("")}
     </div>
   `;
+}
+
+/* ==========================================================
+   12.6. CONTENT CALENDAR
+   ========================================================== */
+function getMondayOfWeek(dateKey) {
+  const d = new Date(dateKey + "T00:00:00");
+  const dow = d.getDay(); // 0=Sun..6=Sat
+  const diff = dow === 0 ? -6 : 1 - dow; // shift back to that week's Monday
+  d.setDate(d.getDate() + diff);
+  return formatDateKey(d);
+}
+
+let contentCalWeekStart = getMondayOfWeek(getTodayKey());
+let contentCalExpandedDay = null; // date key of the one open day-editor, or null
+
+function contentCalDayData(dateKey) {
+  return state.contentCalendar[dateKey] || { account: null, format: null, note: "" };
+}
+
+// Only writes a real entry once something is actually set — reading via
+// contentCalDayData() above never mutates state, so just viewing a week
+// full of empty days doesn't bloat state.contentCalendar with empty rows.
+function setContentCalDay(dateKey, patch) {
+  const existing = state.contentCalendar[dateKey] || { account: null, format: null, note: "" };
+  state.contentCalendar[dateKey] = Object.assign({}, existing, patch);
+  saveState();
+}
+
+function contentCalWeekLabel(weekStart) {
+  const start = new Date(weekStart + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const sameMonth = start.getMonth() === end.getMonth();
+  const startLabel = `${MONTHS[start.getMonth()].slice(0, 3)} ${start.getDate()}`;
+  const endLabel = sameMonth ? `${end.getDate()}` : `${MONTHS[end.getMonth()].slice(0, 3)} ${end.getDate()}`;
+  return `${startLabel} – ${endLabel}`;
+}
+
+function contentCalDayCardHtml(dateKey) {
+  const d = new Date(dateKey + "T00:00:00");
+  const isToday = dateKey === getTodayKey();
+  const data = contentCalDayData(dateKey);
+  const account = CONTENT_ACCOUNTS.find(a => a.id === data.account);
+  const format = CONTENT_FORMATS.find(f => f.id === data.format);
+  const expanded = contentCalExpandedDay === dateKey;
+
+  return `
+    <div class="content-day ${expanded ? "expanded" : ""} ${isToday ? "is-today" : ""}" data-date="${dateKey}">
+      <button type="button" class="content-day-head" data-toggle-day="${dateKey}">
+        <div class="content-day-date">
+          <span class="content-day-weekday">${WEEKDAYS[d.getDay()]}</span>
+          <span class="content-day-num">${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}</span>
+        </div>
+        <div class="content-day-summary">
+          ${account || format
+            ? `${account ? `<span class="content-chip content-chip-account">${escapeHtml(account.label)}</span>` : ""}${format ? `<span class="content-chip content-chip-format">${escapeHtml(format.label)}</span>` : ""}`
+            : `<span class="content-day-empty">Not planned</span>`}
+        </div>
+        <span class="content-day-chevron">${ICONS.chevronDown}</span>
+      </button>
+      ${expanded ? `
+        <div class="content-day-editor">
+          <p class="content-field-label">Account</p>
+          <div class="content-pill-row">
+            ${CONTENT_ACCOUNTS.map(a => `<button type="button" class="content-pill ${data.account === a.id ? "active" : ""}" data-set-account="${a.id}">${escapeHtml(a.label)}</button>`).join("")}
+          </div>
+          <p class="content-field-label">Format</p>
+          <div class="content-format-list">
+            ${CONTENT_FORMATS.map(f => `
+              <button type="button" class="content-format-row ${data.format === f.id ? "active" : ""}" data-set-format="${f.id}">
+                <span class="content-format-row-label">${escapeHtml(f.label)}</span>
+                <span class="content-format-row-desc">${escapeHtml(f.desc)}</span>
+              </button>
+            `).join("")}
+          </div>
+          <p class="content-field-label">Note</p>
+          <textarea class="content-note-input" data-note-for="${dateKey}" placeholder="What's this video going to be about?">${escapeHtml(data.note)}</textarea>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+function renderContentCalendar() {
+  const days = [];
+  for (let i = 0; i < 7; i++) days.push(addDaysToKey(contentCalWeekStart, i));
+
+  document.getElementById("page-content").innerHTML = `
+    <p class="eyebrow">Content Calendar</p>
+    <h1 class="content-cal-title">Content Calendar</h1>
+    <p class="content-cal-intro">Plan what you're posting on your personal and web design accounts — for business owners interested in websites, SEO, and growing online.</p>
+
+    <div class="content-cal-nav">
+      <button id="content-cal-prev" aria-label="Previous week">${ICONS.chevronLeft}</button>
+      <span class="content-cal-week-label">${contentCalWeekLabel(contentCalWeekStart)}</span>
+      <button id="content-cal-next" aria-label="Next week">${ICONS.chevronRight}</button>
+    </div>
+
+    <div class="content-cal-list">
+      ${days.map(contentCalDayCardHtml).join("")}
+    </div>
+  `;
+
+  document.getElementById("content-cal-prev").addEventListener("click", function () {
+    contentCalWeekStart = addDaysToKey(contentCalWeekStart, -7);
+    contentCalExpandedDay = null;
+    renderContentCalendar();
+  });
+  document.getElementById("content-cal-next").addEventListener("click", function () {
+    contentCalWeekStart = addDaysToKey(contentCalWeekStart, 7);
+    contentCalExpandedDay = null;
+    renderContentCalendar();
+  });
+
+  document.querySelectorAll("[data-toggle-day]").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const key = btn.dataset.toggleDay;
+      contentCalExpandedDay = contentCalExpandedDay === key ? null : key;
+      renderContentCalendar();
+    });
+  });
+
+  document.querySelectorAll("[data-set-account]").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const dateKey = btn.closest(".content-day").dataset.date;
+      const current = contentCalDayData(dateKey).account;
+      setContentCalDay(dateKey, { account: current === btn.dataset.setAccount ? null : btn.dataset.setAccount });
+      renderContentCalendar();
+    });
+  });
+  document.querySelectorAll("[data-set-format]").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const dateKey = btn.closest(".content-day").dataset.date;
+      const current = contentCalDayData(dateKey).format;
+      setContentCalDay(dateKey, { format: current === btn.dataset.setFormat ? null : btn.dataset.setFormat });
+      renderContentCalendar();
+    });
+  });
+  // Just saves — never re-renders on every keystroke, which would tear
+  // down and recreate this very textarea mid-typing and steal its own
+  // focus. Safe to skip a re-render here: the collapsed day's chip summary
+  // only reflects account/format, never the note text, so there's nothing
+  // visually stale to fix up afterward.
+  const noteInput = document.querySelector(".content-note-input");
+  if (noteInput) {
+    noteInput.addEventListener("input", function () {
+      setContentCalDay(noteInput.dataset.noteFor, { note: noteInput.value });
+    });
+  }
 }
 
 /* ==========================================================
