@@ -125,7 +125,10 @@ function defaultState() {
     // Flat date-keyed map, same convention as `days` — but never touched by
     // ensureDayRecord()/the midnight reset, since planned content for a
     // future or past day must never be wiped just because a day changed.
-    contentCalendar: {}
+    contentCalendar: {},
+    // Flat date-keyed map for daily "1% Better" entries — auto-saves on input,
+    // never reset by the day change logic.
+    onePercentBetter: {}
   };
 }
 
@@ -304,7 +307,11 @@ function formatDateKey(d) {
 }
 
 function getTodayKey() {
-  return formatDateKey(new Date());
+  const now = new Date();
+  // Before 5AM, still treat as the previous calendar day so late-night
+  // activity is credited to the day it actually belongs to.
+  if (now.getHours() < 5) now.setDate(now.getDate() - 1);
+  return formatDateKey(now);
 }
 
 function ensureDayRecord(dateKey) {
@@ -322,16 +329,18 @@ function ensureDayRecord(dateKey) {
 }
 
 // Guarantees the faith/workout reset is visible even if the app is left open
-// straight through midnight with no interaction (ensureDayRecord is otherwise
-// lazy — it only fires on the next render). Re-arms itself every 24h.
-function armMidnightWatcher() {
+// straight through 5AM with no interaction (ensureDayRecord is otherwise
+// lazy — it only fires on the next render). The new day starts at 5AM, not
+// midnight, so late-night work is credited to the correct day.
+function arm5AMWatcher() {
   const now = new Date();
-  const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  const next5AM = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 5, 0, 5);
+  if (now >= next5AM) next5AM.setDate(next5AM.getDate() + 1);
   setTimeout(function () {
     ensureDayRecord(getTodayKey());
     renderSection(currentSectionName);
-    armMidnightWatcher();
-  }, nextMidnight - now);
+    arm5AMWatcher();
+  }, next5AM - now);
 }
 
 function uid(prefix) {
@@ -618,7 +627,7 @@ function renderHomeToday() {
       <div class="overview-grid">
         <div class="overview-chip ring-chip ${todosTotal > 0 && todosDone === todosTotal ? "done" : ""}">
           ${ring(todosTotal > 0 ? Math.round((todosDone / todosTotal) * 100) : 0, 40, 5)}
-          <span class="overview-label">To-Dos</span>
+          <span class="overview-label">Work</span>
           <span class="overview-value">${todosDone}/${todosTotal}</span>
         </div>
         <div class="overview-chip ${PRAYER_TIMES.every(p => day.faith.prayerTimes[p.key]) ? "done" : ""}">
@@ -732,7 +741,10 @@ function todoItemHtml(t, showDate) {
         ${t.description ? `<span class="todo-meta todo-desc-meta">${escapeHtml(t.description)}</span>` : ""}
         ${metaParts.length ? `<span class="todo-meta">${metaParts.join("")}</span>` : ""}
       </div>
-      <button class="todo-delete" data-action="delete" aria-label="Delete task">✕</button>
+      <div class="todo-item-actions">
+        <button class="todo-edit" data-action="edit" aria-label="Edit task"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="todo-delete" data-action="delete" aria-label="Delete task">✕</button>
+      </div>
     </li>
   `;
 }
@@ -750,10 +762,11 @@ let sheetCalMonth = new Date().getMonth();
 
 function renderTodo() {
   document.getElementById("page-todo").innerHTML = `
-    <h1 class="page-title">To-Do</h1>
+    <h1 class="page-title">Work</h1>
     <div class="seg-control">
       <button class="seg-btn ${todoView === "list" ? "active" : ""}" data-view="list">List</button>
       <button class="seg-btn ${todoView === "calendar" ? "active" : ""}" data-view="calendar">Calendar</button>
+      <button class="seg-btn ${todoView === "better" ? "active" : ""}" data-view="better">1% Better</button>
     </div>
     <div id="todo-view-content"></div>
   `;
@@ -779,31 +792,86 @@ function renderTodo() {
     if (btn.dataset.action === "toggle") {
       const todo = state.todos.find(t => t.id === id);
       todo.done = !todo.done;
+      saveState();
+      renderTodoList();
     } else if (btn.dataset.action === "delete") {
       state.todos = state.todos.filter(t => t.id !== id);
+      saveState();
+      renderTodoList();
+    } else if (btn.dataset.action === "edit") {
+      startInlineEdit(li, id);
     }
-    saveState();
-    renderTodoList();
   });
 
   if (todoView === "list") {
     renderTodoList();
     document.getElementById("todo-fab").classList.remove("hidden");
     if (speechRecognitionSupported()) document.getElementById("voice-fab").classList.remove("hidden");
-  } else {
+  } else if (todoView === "calendar") {
     renderCalendar("todo-view-content");
+    document.getElementById("todo-fab").classList.add("hidden");
+    document.getElementById("voice-fab").classList.add("hidden");
+  } else {
+    renderOnePctBetter();
     document.getElementById("todo-fab").classList.add("hidden");
     document.getElementById("voice-fab").classList.add("hidden");
   }
 }
 
+function startInlineEdit(li, id) {
+  const todo = state.todos.find(t => t.id === id);
+  if (!todo) return;
+  const mainEl = li.querySelector(".todo-item-main");
+  mainEl.innerHTML = `
+    <input class="todo-inline-name" value="${escapeHtml(todo.text)}" maxlength="120" autocomplete="off" aria-label="Task name" />
+    <input class="todo-inline-desc" value="${escapeHtml(todo.description || '')}" placeholder="Description" maxlength="300" autocomplete="off" aria-label="Description" />
+  `;
+  li.classList.add("editing");
+  const nameInput = li.querySelector(".todo-inline-name");
+  const descInput = li.querySelector(".todo-inline-desc");
+  nameInput.focus();
+  nameInput.select();
+
+  let saved = false;
+  function saveInlineEdit() {
+    if (saved) return;
+    saved = true;
+    const newText = nameInput.value.trim();
+    if (newText) {
+      todo.text = newText;
+      todo.description = descInput.value.trim();
+      saveState();
+    }
+    renderTodoList();
+  }
+
+  nameInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); descInput.focus(); }
+    if (e.key === "Escape") { saved = true; renderTodoList(); }
+  });
+  descInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); saveInlineEdit(); }
+    if (e.key === "Escape") { saved = true; renderTodoList(); }
+  });
+  nameInput.addEventListener("blur", () => setTimeout(saveInlineEdit, 120));
+  descInput.addEventListener("blur", () => setTimeout(saveInlineEdit, 120));
+}
+
 function renderTodoList() {
   const today = new Date();
   const todayKey = getTodayKey();
-  const todayTodos = state.todos.filter(t => t.date <= todayKey);
+  const overdueTodos = state.todos.filter(t => t.date < todayKey && !t.done).sort((a, b) => a.date.localeCompare(b.date));
+  const todayTodos = state.todos.filter(t => t.date === todayKey);
   const upcomingTodos = state.todos.filter(t => t.date > todayKey).sort((a, b) => a.date.localeCompare(b.date));
   const todosDone = todayTodos.filter(t => t.done).length;
   const dateHeader = `${MONTHS[today.getMonth()].slice(0, 3)} ${today.getDate()} · Today · ${WEEKDAYS[today.getDay()]}`;
+
+  const overdueHtml = overdueTodos.length
+    ? `
+      <h2 class="todo-section-label todo-overdue-label">Overdue</h2>
+      <ul class="todo-list todo-overdue-list">${overdueTodos.map(t => todoItemHtml(t, true)).join("")}</ul>
+    `
+    : "";
 
   const todayHtml = todayTodos.length
     ? todayTodos.map(t => todoItemHtml(t, false)).join("")
@@ -817,6 +885,7 @@ function renderTodoList() {
     : "";
 
   document.getElementById("todo-view-content").innerHTML = `
+    ${overdueHtml}
     <p class="todo-count">${ICONS.check} ${todosDone}/${todayTodos.length} done today</p>
     <div class="todo-date-divider"><span>${dateHeader}</span></div>
 
@@ -929,8 +998,8 @@ function addTaskSheetHtml() {
     <div class="todo-sheet" id="todo-sheet-panel" role="dialog" aria-label="Add task">
       <div class="todo-sheet-handle"></div>
       <form id="todo-sheet-form">
-        <input type="text" id="todo-sheet-name" class="todo-name-input" placeholder="e.g., Call the supplier" aria-label="Task name" autocomplete="off" maxlength="120" value="${escapeHtml(todoDraftText)}" />
-        <input type="text" id="todo-sheet-desc" class="todo-desc-input" placeholder="Description" aria-label="Description" autocomplete="off" maxlength="300" value="${escapeHtml(todoDraftDescription)}" />
+        <textarea id="todo-sheet-name" class="todo-name-input" placeholder="e.g., Call the supplier" aria-label="Task name" autocomplete="off" maxlength="120" rows="1">${escapeHtml(todoDraftText)}</textarea>
+        <textarea id="todo-sheet-desc" class="todo-desc-input" placeholder="Description" aria-label="Description" autocomplete="off" maxlength="300" rows="1">${escapeHtml(todoDraftDescription)}</textarea>
         <div class="todo-chip-row">
           <button type="button" class="todo-pill" id="todo-pill-date">
             ${ICONS.calendar}<span>${dateLabel}${todoDraftTime ? ` · ${formatTimeLabel(todoDraftTime)}` : ""}</span>
@@ -948,7 +1017,21 @@ function addTaskSheetHtml() {
   `;
 }
 
+function autoResizeTextarea(el) {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
+
 function attachAddTaskSheetEvents() {
+  ["todo-sheet-name", "todo-sheet-desc"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    autoResizeTextarea(el);
+    el.addEventListener("input", () => autoResizeTextarea(el));
+  });
+  const nameEl = document.getElementById("todo-sheet-name");
+  if (nameEl) { nameEl.focus(); nameEl.selectionStart = nameEl.selectionEnd = nameEl.value.length; }
+
   document.getElementById("todo-sheet-cancel").addEventListener("click", closeTodoSheet);
 
   document.getElementById("todo-pill-priority").addEventListener("click", function () {
@@ -966,6 +1049,16 @@ function attachAddTaskSheetEvents() {
     sheetCalMonth = base.getMonth();
     renderTodoSheet();
   });
+
+  const nameTextarea = document.getElementById("todo-sheet-name");
+  if (nameTextarea) {
+    nameTextarea.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById("todo-sheet-desc").focus();
+      }
+    });
+  }
 
   document.getElementById("todo-sheet-form").addEventListener("submit", function (e) {
     e.preventDefault();
@@ -1082,6 +1175,45 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
+}
+
+function renderOnePctBetter() {
+  const todayKey = getTodayKey();
+  const bucket = state.onePercentBetter || {};
+  const todayEntry = bucket[todayKey] || "";
+  const history = Object.entries(bucket)
+    .filter(([k]) => k !== todayKey)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .slice(0, 60);
+
+  const historyHtml = history.length
+    ? history.map(([k, v]) => `
+        <div class="better-history-item">
+          <span class="better-history-date">${formatShortDate(k)}</span>
+          <p class="better-history-text">${escapeHtml(v)}</p>
+        </div>
+      `).join("")
+    : `<p class="better-empty">Your past entries will appear here.</p>`;
+
+  document.getElementById("todo-view-content").innerHTML = `
+    <div class="better-today-card">
+      <h2 class="better-today-label">Tomorrow I will get 1% better by…</h2>
+      <textarea id="better-input" class="better-input" placeholder="Write one small thing you'll do tomorrow to improve…" maxlength="500" autocomplete="off">${escapeHtml(todayEntry)}</textarea>
+    </div>
+    <h2 class="todo-section-label better-history-heading" style="margin-top:28px">Previous entries</h2>
+    <div class="better-history">${historyHtml}</div>
+  `;
+
+  const textarea = document.getElementById("better-input");
+  textarea.style.height = "auto";
+  textarea.style.height = textarea.scrollHeight + "px";
+  textarea.addEventListener("input", function () {
+    textarea.style.height = "auto";
+    textarea.style.height = textarea.scrollHeight + "px";
+    if (!state.onePercentBetter) state.onePercentBetter = {};
+    state.onePercentBetter[todayKey] = textarea.value;
+    saveState();
+  });
 }
 
 /* ==========================================================
@@ -1501,7 +1633,7 @@ function renderYou() {
     <div class="you-stat-card">
       <div>
         <span class="you-stat-value">${todosDone}/${todosToday.length}</span>
-        <span class="you-stat-label">To-Dos Today</span>
+        <span class="you-stat-label">Work Today</span>
       </div>
     </div>
   `;
@@ -2596,7 +2728,7 @@ function initApp() {
   document.getElementById("sidebar-reopen-btn").addEventListener("click", () => setSidebarCollapsed(false));
   showSection("home");
   registerServiceWorker();
-  armMidnightWatcher();
+  arm5AMWatcher();
   subscribeToStateChanges();
   subscribeToNotesChanges();
   setupNotesMobileBarKeyboardHandling();

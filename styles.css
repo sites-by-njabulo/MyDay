@@ -1399,6 +1399,124 @@ button, input { font-family: inherit; }
   transition: color 0.15s var(--ease-out-quart), background 0.15s var(--ease-out-quart);
 }
 .todo-delete:hover { color: var(--danger); background: rgba(239, 68, 68, 0.1); }
+
+/* Edit + delete grouped at the right of each task item */
+.todo-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease-out-quart);
+}
+.todo-item:hover .todo-item-actions,
+.todo-item.editing .todo-item-actions { opacity: 1; }
+.todo-edit {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s var(--ease-out-quart), background 0.15s var(--ease-out-quart);
+}
+.todo-edit svg { width: 14px; height: 14px; }
+.todo-edit:hover { color: var(--accent); background: var(--accent-soft); }
+
+/* Inline edit fields (replaces todo-item-main content during editing) */
+.todo-inline-name,
+.todo-inline-desc {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  outline: none;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  padding: 2px 0;
+}
+.todo-inline-name { font-size: 14.5px; font-weight: 500; border-bottom: 1px solid var(--accent); margin-bottom: 6px; }
+.todo-inline-desc { font-size: 13px; font-weight: 500; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+
+/* Overdue section */
+.todo-overdue-label { color: var(--danger); }
+.todo-overdue-list .todo-text { color: var(--danger); opacity: 0.9; }
+.todo-overdue-list .todo-item { border-left: 2px solid var(--danger); padding-left: 10px; }
+
+/* 1% Better tab */
+.better-today-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 4px;
+}
+.better-today-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 14px;
+}
+.better-input {
+  display: block;
+  width: 100%;
+  min-height: 80px;
+  border: none;
+  background: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.6;
+  padding: 0;
+}
+.better-input::placeholder { color: var(--text-secondary); }
+.better-history-heading { margin-top: 0; }
+.better-history { display: flex; flex-direction: column; gap: 10px; }
+.better-history-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.better-history-date {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.better-history-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+.better-empty {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-style: italic;
+}
+
+/* Auto-expand textarea in Add Task sheet */
+.todo-name-input,
+.todo-desc-input {
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+  min-height: 0;
+  field-sizing: content;
+}
+
 .todo-empty {
   list-style: none;
   text-align: center;
