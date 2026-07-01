@@ -720,6 +720,101 @@ const PRIORITY_INFO = {
   med: { label: "Medium priority", color: "var(--priority-medium)" },
   high: { label: "High priority", color: "var(--priority-high)" }
 };
+
+/* ==========================================================
+   27-DAY SALES & COMMUNICATION CHALLENGE — data
+   ========================================================== */
+const CHALLENGE27_KEY = "myday_27day";
+
+const CHALLENGE27_TASKS = [
+  { id: "video",  label: "Film a 3–5 minute video" },
+  { id: "review", label: "Review yesterday's video — 10 minutes" },
+  { id: "script", label: "Read sales script out loud — 20 minutes" },
+  { id: "pencil", label: "Pencil drill — 10 minutes with pencil between teeth, reading out loud" }
+];
+
+const CHALLENGE27_PLAN = [
+  {
+    days: "Day 1",
+    title: "Build the sales script",
+    desc: "Write the full script including opening, discovery questions, pitch, price, and close. Write every objection you fear and a confident response to each one. Read the full script out loud 3 times before the day ends. This script gets read every single day from here on."
+  },
+  {
+    days: "Days 2–3",
+    title: "How to open and hold conversations",
+    desc: "Learn how to greet people naturally, start conversations without it feeling forced, and keep talking without oversharing. Practice out loud every session."
+  },
+  {
+    days: "Days 4–5",
+    title: "Speaking clearly and with confidence",
+    desc: "Focus on pronunciation, pace, and vocal tone. Read out loud from anything for 20 minutes. Record it, listen back, and find where you rushed or mumbled. Fix it the next day."
+  },
+  {
+    days: "Days 6–7",
+    title: "Body language",
+    desc: "Learn posture, eye contact, hand gestures, and how to carry yourself on a call and on camera. Practice in front of a mirror and record yourself watching back."
+  },
+  {
+    days: "Days 8–9",
+    title: "Storytelling",
+    desc: "Learn the structure — situation, problem, resolution. Tell one real story per day about something that happened to you. Keep it under 2 minutes. Record and listen back."
+  },
+  {
+    days: "Days 10–11",
+    title: "How to sound smarter and more articulate",
+    desc: "Watch videos on speaking intelligently and articulating thoughts clearly. Pick 3 things from what you watch and practice them out loud that same day."
+  },
+  {
+    days: "Days 12–13",
+    title: "How to speak when your mind goes blank",
+    desc: "Learn how to pause with confidence instead of saying um and uh. Practice speaking on a random topic for 2 minutes straight without stopping. Do 5 rounds per session."
+  },
+  {
+    days: "Days 14–17",
+    title: "Communication training under pressure",
+    desc: "Open Claude or ChatGPT and say \"Act as someone I just met. Start a conversation with me and push back if I ramble, overshare, or go off topic.\" Practice holding a natural confident conversation. Each session ask it to be more challenging than the last."
+  },
+  {
+    days: "Days 18–20",
+    title: "Alex Hormozi ultimate sales training",
+    desc: "Watch and take notes on the full Alex Hormozi sales training video spread over 3 days during the 50 minute focus window. Write down everything that applies to your situation."
+  },
+  {
+    days: "Days 21–22",
+    title: "Watch real sales call recordings",
+    desc: "Find sales call recordings on YouTube. Watch how they open, handle silence, deal with objections, and close. Write down 3 specific things to copy in your own calls."
+  },
+  {
+    days: "Days 23–24",
+    title: "Objection handling training",
+    desc: "Take every objection from your script. Say each one out loud as if the client just said it. Pause. Then respond naturally without reading. 10 rounds per session."
+  },
+  {
+    days: "Days 25–26",
+    title: "AI pressure training for sales",
+    desc: "Open Claude or ChatGPT and say \"Act as a skeptical US home service business owner. I am going to pitch my web design services to you. Give me real objections and push back hard.\" Go through the full script from start to close."
+  },
+  {
+    days: "Day 27",
+    title: "Final review",
+    desc: "Film a 5 minute video and compare it to day 1. Write your honest review of what changed, what still needs work, and what the next phase looks like."
+  }
+];
+
+function load27DayData() {
+  try {
+    const raw = localStorage.getItem(CHALLENGE27_KEY);
+    if (!raw) return { checks: {}, feedback: {} };
+    const parsed = JSON.parse(raw);
+    if (!parsed.checks) parsed.checks = {};
+    if (!parsed.feedback) parsed.feedback = {};
+    return parsed;
+  } catch { return { checks: {}, feedback: {} }; }
+}
+
+function save27DayData(data) {
+  localStorage.setItem(CHALLENGE27_KEY, JSON.stringify(data));
+}
 const PRIORITY_CYCLE = [null, "low", "med", "high"];
 
 function todoItemHtml(t, showDate) {
@@ -749,7 +844,8 @@ function todoItemHtml(t, showDate) {
   `;
 }
 
-let todoView = "list"; // "list" | "calendar"
+let todoView = "list"; // "list" | "calendar" | "better" | "sc27"
+let challenge27ExpandedDay = null; // index of currently-open plan entry, or null
 let todoSheetOpen = false;
 let todoDateSubSheetOpen = false;
 let todoDraftText = "";
@@ -767,6 +863,7 @@ function renderTodo() {
       <button class="seg-btn ${todoView === "list" ? "active" : ""}" data-view="list">List</button>
       <button class="seg-btn ${todoView === "calendar" ? "active" : ""}" data-view="calendar">Calendar</button>
       <button class="seg-btn ${todoView === "better" ? "active" : ""}" data-view="better">1% Better</button>
+      <button class="seg-btn ${todoView === "sc27" ? "active" : ""}" data-view="sc27">27 Day Challenge</button>
     </div>
     <div id="todo-view-content"></div>
   `;
@@ -811,8 +908,12 @@ function renderTodo() {
     renderCalendar("todo-view-content");
     document.getElementById("todo-fab").classList.add("hidden");
     document.getElementById("voice-fab").classList.add("hidden");
-  } else {
+  } else if (todoView === "better") {
     renderOnePctBetter();
+    document.getElementById("todo-fab").classList.add("hidden");
+    document.getElementById("voice-fab").classList.add("hidden");
+  } else {
+    render27DayChallenge();
     document.getElementById("todo-fab").classList.add("hidden");
     document.getElementById("voice-fab").classList.add("hidden");
   }
@@ -1212,6 +1313,109 @@ function renderOnePctBetter() {
     if (!state.onePercentBetter) state.onePercentBetter = {};
     state.onePercentBetter[todayKey] = textarea.value;
     saveState();
+  });
+}
+
+function render27DayChallenge() {
+  const todayKey = getTodayKey();
+  const data = load27DayData();
+  const todayChecks = data.checks[todayKey] || {};
+  const allDone = CHALLENGE27_TASKS.every(t => todayChecks[t.id]);
+
+  const checkSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>`;
+
+  const checklistHtml = `
+    <div class="sc27-card">
+      <h2 class="sc27-card-title">Daily Checklist</h2>
+      <p class="sc27-card-sub">Resets every day at 5AM</p>
+      <ul class="sc27-tasklist">
+        ${CHALLENGE27_TASKS.map(task => `
+          <li class="sc27-task ${todayChecks[task.id] ? "done" : ""}">
+            <button class="sc27-check ${todayChecks[task.id] ? "checked" : ""}" data-task="${task.id}" aria-label="${task.label}">
+              ${todayChecks[task.id] ? checkSvg : ""}
+            </button>
+            <span class="sc27-task-label">${task.label}</span>
+          </li>
+        `).join("")}
+      </ul>
+      ${allDone ? `
+        <div class="sc27-complete">
+          <span class="sc27-complete-icon">${checkSvg}</span>
+          All four done today. Keep going.
+        </div>
+      ` : ""}
+    </div>
+  `;
+
+  const planHtml = `
+    <div class="sc27-plan-header">
+      <h2 class="sc27-plan-title">27 Day Plan</h2>
+      <p class="sc27-plan-sub">Click any day to expand. Your notes save automatically.</p>
+    </div>
+    <div class="sc27-plan">
+      ${CHALLENGE27_PLAN.map((entry, i) => {
+        const isOpen = challenge27ExpandedDay === i;
+        const fb = data.feedback[i] || { video: "", notes: "" };
+        return `
+          <div class="sc27-day ${isOpen ? "open" : ""}">
+            <button class="sc27-day-head" data-day-toggle="${i}" aria-expanded="${isOpen}">
+              <span class="sc27-day-badge">${entry.days}</span>
+              <span class="sc27-day-title">${entry.title}</span>
+              <span class="sc27-day-chevron">${ICONS.chevronDown}</span>
+            </button>
+            ${isOpen ? `
+              <div class="sc27-day-body">
+                <p class="sc27-day-desc">${entry.desc}</p>
+                <div class="sc27-feedback">
+                  <label class="sc27-feedback-label">Video feedback</label>
+                  <textarea class="sc27-textarea" data-fb-day="${i}" data-fb-type="video" placeholder="How did the video go? What can you improve?" rows="3">${escapeHtml(fb.video)}</textarea>
+                  <label class="sc27-feedback-label" style="margin-top:12px">Day notes</label>
+                  <textarea class="sc27-textarea" data-fb-day="${i}" data-fb-type="notes" placeholder="Notes on today's focus area…" rows="3">${escapeHtml(fb.notes)}</textarea>
+                </div>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  document.getElementById("todo-view-content").innerHTML = checklistHtml + planHtml;
+
+  // Checklist toggles
+  document.querySelectorAll(".sc27-check").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const d = load27DayData();
+      if (!d.checks[todayKey]) d.checks[todayKey] = {};
+      d.checks[todayKey][btn.dataset.task] = !d.checks[todayKey][btn.dataset.task];
+      save27DayData(d);
+      render27DayChallenge();
+    });
+  });
+
+  // Accordion toggles
+  document.querySelectorAll("[data-day-toggle]").forEach(btn => {
+    btn.addEventListener("click", function () {
+      const idx = parseInt(btn.dataset.dayToggle);
+      challenge27ExpandedDay = challenge27ExpandedDay === idx ? null : idx;
+      render27DayChallenge();
+    });
+  });
+
+  // Textarea auto-save and auto-resize
+  document.querySelectorAll(".sc27-textarea").forEach(ta => {
+    ta.style.height = "auto";
+    ta.style.height = ta.scrollHeight + "px";
+    ta.addEventListener("input", function () {
+      ta.style.height = "auto";
+      ta.style.height = ta.scrollHeight + "px";
+      const idx = parseInt(ta.dataset.fbDay);
+      const type = ta.dataset.fbType;
+      const d = load27DayData();
+      if (!d.feedback[idx]) d.feedback[idx] = { video: "", notes: "" };
+      d.feedback[idx][type] = ta.value;
+      save27DayData(d);
+    });
   });
 }
 
