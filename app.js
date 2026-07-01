@@ -886,7 +886,6 @@ function renderTodoList() {
 
   document.getElementById("todo-view-content").innerHTML = `
     ${overdueHtml}
-    <p class="todo-count">${ICONS.check} ${todosDone}/${todayTodos.length} done today</p>
     <div class="todo-date-divider"><span>${dateHeader}</span></div>
 
     <button class="todo-add-inline" id="todo-add-inline">+ <span>Add task</span></button>
