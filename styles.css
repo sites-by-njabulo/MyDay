@@ -1442,10 +1442,9 @@ button, input { font-family: inherit; }
 .todo-inline-name { font-size: 14.5px; font-weight: 500; border-bottom: 1px solid var(--accent); margin-bottom: 6px; }
 .todo-inline-desc { font-size: 13px; font-weight: 500; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
 
-/* Overdue section */
+/* Overdue section — same layout as Upcoming, only the heading and task names differ */
 .todo-overdue-label { color: var(--danger); }
-.todo-overdue-list .todo-text { color: var(--danger); opacity: 0.9; }
-.todo-overdue-list .todo-item { border-left: 2px solid var(--danger); padding-left: 10px; }
+.todo-overdue-list .todo-text { color: var(--danger); }
 
 /* 1% Better tab */
 .better-today-card {
