@@ -1444,6 +1444,7 @@ button, input { font-family: inherit; }
 
 /* Overdue section — same layout as Upcoming, only the heading and task names differ */
 .todo-overdue-label { color: var(--danger); }
+.todo-overdue-list { margin-bottom: 28px; }
 .todo-overdue-list .todo-text { color: var(--danger); }
 
 /* 1% Better tab */
