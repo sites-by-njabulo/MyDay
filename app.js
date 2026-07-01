@@ -770,32 +770,37 @@ const CHALLENGE27_PLAN = [
     desc: "Learn how to pause with confidence instead of saying um and uh. Practice speaking on a random topic for 2 minutes straight without stopping. Do 5 rounds per session."
   },
   {
-    days: "Days 14–17",
+    days: "Days 14–16",
+    title: "Study creators you look up to",
+    desc: "Pick 2 to 3 people you genuinely look up to in terms of how they communicate. Watch them intentionally. For each video ask yourself how they open, how they transition between points, how they handle silence, and what makes them sound sharp and confident. Write down 3 specific things per session that you want to bring into your own style."
+  },
+  {
+    days: "Days 17–20",
     title: "Communication training under pressure",
     desc: "Open Claude or ChatGPT and say \"Act as someone I just met. Start a conversation with me and push back if I ramble, overshare, or go off topic.\" Practice holding a natural confident conversation. Each session ask it to be more challenging than the last."
   },
   {
-    days: "Days 18–20",
+    days: "Days 21–22",
     title: "Alex Hormozi ultimate sales training",
-    desc: "Watch and take notes on the full Alex Hormozi sales training video spread over 3 days during the 50 minute focus window. Write down everything that applies to your situation."
+    desc: "Watch and take notes on the full Alex Hormozi sales training video spread over 2 days during the 50 minute focus window. Write down everything that applies to your situation."
   },
   {
-    days: "Days 21–22",
+    days: "Days 23–24",
     title: "Watch real sales call recordings",
     desc: "Find sales call recordings on YouTube. Watch how they open, handle silence, deal with objections, and close. Write down 3 specific things to copy in your own calls."
   },
   {
-    days: "Days 23–24",
+    days: "Days 25–26",
     title: "Objection handling training",
     desc: "Take every objection from your script. Say each one out loud as if the client just said it. Pause. Then respond naturally without reading. 10 rounds per session."
   },
   {
-    days: "Days 25–26",
+    days: "Days 27–28",
     title: "AI pressure training for sales",
     desc: "Open Claude or ChatGPT and say \"Act as a skeptical US home service business owner. I am going to pitch my web design services to you. Give me real objections and push back hard.\" Go through the full script from start to close."
   },
   {
-    days: "Day 27",
+    days: "Day 29",
     title: "Final review",
     desc: "Film a 5 minute video and compare it to day 1. Write your honest review of what changed, what still needs work, and what the next phase looks like."
   }
@@ -804,15 +809,28 @@ const CHALLENGE27_PLAN = [
 function load27DayData() {
   try {
     const raw = localStorage.getItem(CHALLENGE27_KEY);
-    if (!raw) return { checks: {}, feedback: {} };
+    if (!raw) return { checks: {}, feedback: {}, v: 2 };
     const parsed = JSON.parse(raw);
     if (!parsed.checks) parsed.checks = {};
     if (!parsed.feedback) parsed.feedback = {};
+    // v1 had 13 entries (indices 0–12); v2 inserts a new entry at index 7
+    // (Days 14–16 "Study creators"), shifting old indices 7–12 → 8–13.
+    if (!parsed.v || parsed.v < 2) {
+      const migrated = {};
+      Object.keys(parsed.feedback).forEach(k => {
+        const idx = parseInt(k);
+        migrated[idx < 7 ? idx : idx + 1] = parsed.feedback[k];
+      });
+      parsed.feedback = migrated;
+      parsed.v = 2;
+      localStorage.setItem(CHALLENGE27_KEY, JSON.stringify(parsed));
+    }
     return parsed;
-  } catch { return { checks: {}, feedback: {} }; }
+  } catch { return { checks: {}, feedback: {}, v: 2 }; }
 }
 
 function save27DayData(data) {
+  data.v = 2;
   localStorage.setItem(CHALLENGE27_KEY, JSON.stringify(data));
 }
 const PRIORITY_CYCLE = [null, "low", "med", "high"];
@@ -863,7 +881,7 @@ function renderTodo() {
       <button class="seg-btn ${todoView === "list" ? "active" : ""}" data-view="list">List</button>
       <button class="seg-btn ${todoView === "calendar" ? "active" : ""}" data-view="calendar">Calendar</button>
       <button class="seg-btn ${todoView === "better" ? "active" : ""}" data-view="better">1% Better</button>
-      <button class="seg-btn ${todoView === "sc27" ? "active" : ""}" data-view="sc27">27 Day Challenge</button>
+      <button class="seg-btn ${todoView === "sc27" ? "active" : ""}" data-view="sc27">29 Day Challenge</button>
     </div>
     <div id="todo-view-content"></div>
   `;
@@ -1349,7 +1367,7 @@ function render27DayChallenge() {
 
   const planHtml = `
     <div class="sc27-plan-header">
-      <h2 class="sc27-plan-title">27 Day Plan</h2>
+      <h2 class="sc27-plan-title">29 Day Plan</h2>
       <p class="sc27-plan-sub">Click any day to expand. Your notes save automatically.</p>
     </div>
     <div class="sc27-plan">
